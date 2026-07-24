@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <h2>Ordens de Serviço</h2>
+
+    <a href="/ordens/nova" class="btn btn-warning">
+        Nova Ordem
+    </a>
+
+</div>
+
+<div class="card bg-dark shadow border-0">
+
+    <div class="card-body">
+
+        <table class="table table-dark table-hover align-middle">
+
+            <thead>
+
+                <tr>
+
+                    <th>Nº</th>
+
+                    <th>Cliente</th>
+
+                    <th>Veículo</th>
+
+                    <th>KM</th>
+
+                    <th>Status</th>
+
+                    <th>Total</th>
+
+                    <th width="360">Ações</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for ordem in ordens %}
+
+                <tr>
+
+                    <td>{{ ordem.numero }}</td>
+
+                    <td>{{ ordem.cliente.nome }}</td>
+
+                    <td>
+                        {{ ordem.veiculo.placa }}
+                        -
+                        {{ ordem.veiculo.marca }}
+                        {{ ordem.veiculo.modelo }}
+                    </td>
+                                        <td>
+
+                        {{ ordem.km }}
+
+                    </td>
+
+                    <td>
+
+                        {% if ordem.status == "FINALIZADA" %}
+
+                            <span class="badge bg-success">
+
+                                FINALIZADA
+
+                            </span>
+
+                        {% else %}
+
+                            <span class="badge bg-warning text-dark">
+
+                                ABERTA
+
+                            </span>
+
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        R$ {{ "%.2f"|format(ordem.valor_total) }}
+
+                    </td>
+
+                    <td>
+
+                        <a href="/ordens/pdf/{{ ordem.id }}"
+                           target="_blank"
+                           class="btn btn-danger btn-sm">
+
+                            PDF
+
+                        </a>
+
+                        <a href="/ordens/editar/{{ ordem.id }}"
+                           class="btn btn-primary btn-sm">
+
+                            Editar
+
+                        </a>
+                                                {% if ordem.status != "FINALIZADA" %}
+
+                        <a href="/ordens/finalizar/{{ ordem.id }}"
+                           class="btn btn-success btn-sm"
+                           onclick="return confirm('Deseja finalizar esta Ordem de Serviço?')">
+
+                            Finalizar
+
+                        </a>
+
+                        {% endif %}
+
+                        <a href="/ordens/excluir/{{ ordem.id }}"
+                           class="btn btn-secondary btn-sm"
+                           onclick="return confirm('Deseja realmente excluir esta Ordem de Serviço?')">
+
+                            Excluir
+
+                        </a>
+
+                    </td>
+
+                </tr>
+                                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+{% endblock %}

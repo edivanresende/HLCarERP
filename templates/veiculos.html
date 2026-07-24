@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}
+Veículos
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <h2>Veículos</h2>
+
+        <a href="/veiculos/novo" class="btn btn-warning">
+            Novo Veículo
+        </a>
+
+    </div>
+
+    <div class="card-dashboard">
+
+        <table class="table table-dark table-hover">
+
+            <thead>
+
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Placa</th>
+                    <th>Marca</th>
+                    <th>Modelo</th>
+                    <th>Ano</th>
+                    <th>Ações</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for veiculo in veiculos %}
+
+                <tr>
+
+                    <td>{{ veiculo.id }}</td>
+                    <td>{{ veiculo.cliente.nome }}</td>
+                    <td>{{ veiculo.placa }}</td>
+                    <td>{{ veiculo.marca }}</td>
+                    <td>{{ veiculo.modelo }}</td>
+                    <td>{{ veiculo.ano }}</td>
+
+                    <td>
+
+                        <button class="btn btn-sm btn-primary" disabled>
+                            Editar
+                        </button>
+
+                        <button class="btn btn-sm btn-danger" disabled>
+                            Excluir
+                        </button>
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}
+Novo Veículo
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <h2 class="mb-4 text-white">
+        Novo Veículo
+    </h2>
+
+    <div class="card-dashboard">
+
+        <form method="POST">
+
+            <div class="row">
+
+                <div class="col-md-6 mb-3">
+
+                    <label>Cliente</label>
+
+                    <select name="cliente_id" class="form-control" required>
+
+                        <option value="">Selecione...</option>
+
+                        {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}">
+                                {{ cliente.nome }}
+                            </option>
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-3 mb-3">
+
+                    <label>Placa</label>
+
+                    <input
+                        type="text"
+                        name="placa"
+                        class="form-control"
+                        required>
+
+                </div>
+
+                <div class="col-md-3 mb-3">
+
+                    <label>Ano</label>
+
+                    <input
+                        type="number"
+                        name="ano"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-4 mb-3">
+
+                    <label>Marca</label>
+
+                    <input
+                        type="text"
+                        name="marca"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-4 mb-3">
+
+                    <label>Modelo</label>
+
+                    <input
+                        type="text"
+                        name="modelo"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-4 mb-3">
+
+                    <label>Cor</label>
+
+                    <input
+                        type="text"
+                        name="cor"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-4 mb-3">
+
+                    <label>KM</label>
+
+                    <input
+                        type="number"
+                        name="km"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-4 mb-3">
+
+                    <label>Chassi</label>
+
+                    <input
+                        type="text"
+                        name="chassi"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-4 mb-3">
+
+                    <label>Motor</label>
+
+                    <input
+                        type="text"
+                        name="motor"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-4 mb-3">
+
+                    <label>Combustível</label>
+
+                    <select
+                        name="combustivel"
+                        class="form-control">
+
+                        <option>Gasolina</option>
+                        <option>Etanol</option>
+                        <option>Flex</option>
+                        <option>Diesel</option>
+                        <option>GNV</option>
+                        <option>Elétrico</option>
+                        <option>Híbrido</option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <button class="btn btn-success">
+                Salvar Veículo
+            </button>
+
+            <a href="/veiculos" class="btn btn-secondary">
+                Cancelar
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,620 @@
+{% extends "base.html" %}
+
+{% block title %}
+Fabricantes
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            <h2 class="text-white">
+
+                <i class="fa fa-industry"></i>
+
+                Fabricantes
+
+            </h2>
+
+            <small class="text-secondary">
+
+                Cadastro dos fabricantes dos produtos comercializados pela HL Car Auto Center.
+
+            </small>
+
+        </div>
+
+        <div>
+
+            <a
+                href="/estoque"
+                class="btn btn-secondary">
+
+                <i class="fa fa-arrow-left"></i>
+
+                Voltar
+
+            </a>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow border-0 mb-4">
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <div class="col-md-8">
+
+                    <form method="GET">
+
+                        <div class="input-group">
+
+                            <span class="input-group-text">
+
+                                <i class="fa fa-search"></i>
+
+                            </span>
+
+                            <input
+                                type="text"
+                                name="pesquisa"
+                                class="form-control"
+                                placeholder="Pesquisar fabricante..."
+                                value="{{ request.args.get('pesquisa','') }}"
+                            >
+
+                            <button
+                                class="btn btn-primary"
+                                type="submit">
+
+                                Pesquisar
+
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+                <div class="col-md-4 text-end">
+
+                    <button
+                        class="btn btn-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalFabricante">
+
+                        <i class="fa fa-plus"></i>
+
+                        Novo Fabricante
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow border-0">
+
+        <div class="card-header bg-dark text-white">
+
+            <h5 class="mb-0">
+
+                Lista de Fabricantes
+
+            </h5>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <table
+                class="table table-dark table-hover align-middle mb-0">
+
+                <thead>
+
+                    <tr>
+
+                        <th width="80">
+
+                            ID
+
+                        </th>
+
+                        <th>
+
+                            Fabricante
+
+                        </th>
+
+                        <th width="170">
+
+                            Produtos
+
+                        </th>
+
+                        <th width="180">
+
+                            Cadastro
+
+                        </th>
+
+                        <th width="120">
+
+                            Situação
+
+                        </th>
+
+                        <th width="180">
+
+                            Ações
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+                    {% for fabricante in fabricantes %}
+
+<tr>
+
+    <td>
+
+        {{ fabricante.id }}
+
+    </td>
+
+    <td>
+
+        <strong>
+
+            {{ fabricante.nome }}
+
+        </strong>
+
+    </td>
+
+    <td>
+
+        {{ fabricante.produtos|length }}
+
+    </td>
+
+    <td>
+
+        {% if fabricante.criado_em %}
+
+            {{ fabricante.criado_em.strftime("%d/%m/%Y") }}
+
+        {% else %}
+
+            -
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {% if fabricante.ativo %}
+
+            <span class="badge bg-success">
+
+                Ativo
+
+            </span>
+
+        {% else %}
+
+            <span class="badge bg-danger">
+
+                Inativo
+
+            </span>
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        <button
+            class="btn btn-primary btn-sm"
+            onclick="editarFabricante(
+                '{{ fabricante.id }}',
+                '{{ fabricante.nome }}',
+                '{{ fabricante.site or "" }}',
+                '{{ fabricante.telefone or "" }}',
+                '{{ fabricante.email or "" }}',
+                {{ 'true' if fabricante.ativo else 'false' }}
+            )">
+
+            <i class="fa fa-edit"></i>
+
+        </button>
+
+        <button
+            class="btn btn-danger btn-sm"
+            onclick="excluirFabricante(
+                '{{ fabricante.id }}',
+                '{{ fabricante.nome }}'
+            )">
+
+            <i class="fa fa-trash"></i>
+
+        </button>
+
+    </td>
+
+</tr>
+
+{% else %}
+
+<tr>
+
+    <td
+        colspan="6"
+        class="text-center py-5 text-secondary">
+
+        <i class="fa fa-industry fa-3x mb-3"></i>
+
+        <h5>
+
+            Nenhum fabricante cadastrado.
+
+        </h5>
+
+        <p>
+
+            Clique em <strong>Novo Fabricante</strong> para realizar o primeiro cadastro.
+
+        </p>
+
+    </td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+    <!-- ==========================================
+         MODAL CADASTRO / EDIÇÃO DE FABRICANTE
+    =========================================== -->
+
+    <div
+        class="modal fade"
+        id="modalFabricante"
+        tabindex="-1"
+        aria-hidden="true">
+
+        <div class="modal-dialog modal-lg">
+
+            <div class="modal-content bg-dark text-white">
+
+                <form
+                    method="POST"
+                    action="/fabricantes/salvar">
+
+                    <input
+                        type="hidden"
+                        name="id"
+                        id="fabricante_id">
+
+                    <div class="modal-header">
+
+                        <h5 class="modal-title">
+
+                            <i class="fa fa-industry"></i>
+
+                            Cadastro de Fabricante
+
+                        </h5>
+
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal">
+
+                        </button>
+
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="row g-3">
+
+                            <div class="col-md-12">
+
+                                <label class="form-label">
+
+                                    Nome do Fabricante
+
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    name="nome"
+                                    id="fabricante_nome"
+                                    maxlength="120"
+                                    required>
+
+                            </div>
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+
+                                    Site
+
+                                </label>
+
+                                <input
+                                    type="url"
+                                    class="form-control"
+                                    name="site"
+                                    id="fabricante_site"
+                                    placeholder="https://">
+
+                            </div>
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+
+                                    Telefone
+
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    name="telefone"
+                                    id="fabricante_telefone">
+
+                            </div>
+
+                            <div class="col-md-12">
+
+                                <label class="form-label">
+
+                                    E-mail
+
+                                </label>
+
+                                <input
+                                    type="email"
+                                    class="form-control"
+                                    name="email"
+                                    id="fabricante_email">
+
+                            </div>
+
+                            <div class="col-md-12">
+
+                                <label class="form-label">
+
+                                    Observações
+
+                                </label>
+
+                                <textarea
+                                    class="form-control"
+                                    rows="4"
+                                    name="observacoes"
+                                    id="fabricante_observacoes"
+                                    placeholder="Informações adicionais sobre o fabricante..."></textarea>
+
+                            </div>
+
+                            <div class="col-md-12">
+
+                                <div class="form-check form-switch">
+
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        id="fabricante_ativo"
+                                        name="ativo"
+                                        checked>
+
+                                    <label
+                                        class="form-check-label"
+                                        for="fabricante_ativo">
+
+                                        Fabricante ativo
+
+                                    </label>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+
+                            Cancelar
+
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="btn btn-success">
+
+                            <i class="fa fa-save"></i>
+
+                            Salvar Fabricante
+
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+    <script>
+
+function editarFabricante(id, nome, site, telefone, email, ativo){
+
+    document.getElementById("fabricante_id").value = id;
+
+    document.getElementById("fabricante_nome").value = nome;
+
+    document.getElementById("fabricante_site").value = site || "";
+
+    document.getElementById("fabricante_telefone").value = telefone || "";
+
+    document.getElementById("fabricante_email").value = email || "";
+
+    document.getElementById("fabricante_ativo").checked = ativo;
+
+    const modal = new bootstrap.Modal(
+        document.getElementById("modalFabricante")
+    );
+
+    modal.show();
+
+}
+
+function excluirFabricante(id, nome){
+
+    if(confirm(
+        "Deseja realmente excluir o fabricante '" +
+        nome +
+        "'?"
+    )){
+
+        window.location.href =
+            "/fabricantes/excluir/" + id;
+
+    }
+
+}
+
+const telefone = document.getElementById("fabricante_telefone");
+
+telefone.addEventListener("input", function(){
+
+    let valor = this.value.replace(/\D/g,"");
+
+    if(valor.length > 11){
+
+        valor = valor.substring(0,11);
+
+    }
+
+    if(valor.length > 10){
+
+        valor = valor.replace(
+            /^(\d{2})(\d{5})(\d{4}).*/,
+            "($1) $2-$3"
+        );
+
+    }else if(valor.length > 6){
+
+        valor = valor.replace(
+            /^(\d{2})(\d{4})(\d{0,4}).*/,
+            "($1) $2-$3"
+        );
+
+    }else if(valor.length > 2){
+
+        valor = valor.replace(
+            /^(\d{2})(\d+)/,
+            "($1) $2"
+        );
+
+    }
+
+    this.value = valor;
+
+});
+
+</script>
+
+<style>
+
+.card{
+
+    border-radius:12px;
+
+}
+
+.card-header{
+
+    font-weight:600;
+
+}
+
+.table td{
+
+    vertical-align:middle;
+
+}
+
+.table th{
+
+    white-space:nowrap;
+
+}
+
+.btn{
+
+    border-radius:8px;
+
+}
+
+.modal-content{
+
+    border-radius:12px;
+
+}
+
+.form-control{
+
+    border-radius:8px;
+
+}
+
+.form-check-input{
+
+    cursor:pointer;
+
+}
+
+</style>
+
+{% endblock %}

@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}
+Editar Ordem de Serviço
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <h2 class="mb-4">
+        Editar Ordem de Serviço
+    </h2>
+
+    <div class="card-dashboard">
+
+        <form method="POST">
+
+            <div class="row">
+
+                <div class="col-md-6 mb-3">
+
+                    <label>Cliente</label>
+
+                    <select
+                        name="cliente_id"
+                        class="form-control"
+                        required>
+
+                        {% for cliente in clientes %}
+
+                        <option
+                            value="{{ cliente.id }}"
+                            {% if cliente.id == ordem.cliente_id %}selected{% endif %}>
+
+                            {{ cliente.nome }}
+
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-6 mb-3">
+
+                    <label>Veículo</label>
+
+                    <select
+                        name="veiculo_id"
+                        class="form-control"
+                        required>
+
+                        {% for veiculo in veiculos %}
+
+                        <option
+                            value="{{ veiculo.id }}"
+                            {% if veiculo.id == ordem.veiculo_id %}selected{% endif %}>
+
+                            {{ veiculo.placa }} - {{ veiculo.modelo }}
+
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-3 mb-3">
+
+                    <label>KM</label>
+
+                    <input
+                        type="number"
+                        name="km"
+                        value="{{ ordem.km }}"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-9 mb-3">
+
+                    <label>Mecânico</label>
+
+                    <input
+                        type="text"
+                        name="mecanico"
+                        value="{{ ordem.mecanico }}"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-12 mb-3">
+
+                    <label>Defeito Relatado</label>
+
+                    <textarea
+                        name="defeito_relatado"
+                        rows="3"
+                        class="form-control">{{ ordem.defeito_relatado }}</textarea>
+
+                </div>
+
+                <div class="col-12 mb-3">
+
+                    <label>Diagnóstico</label>
+
+                    <textarea
+                        name="diagnostico"
+                        rows="3"
+                        class="form-control">{{ ordem.diagnostico }}</textarea>
+
+                </div>
+
+                <div class="col-12 mb-3">
+
+                    <label>Serviço Executado</label>
+
+                    <textarea
+                        name="servico_executado"
+                        rows="3"
+                        class="form-control">{{ ordem.servico_executado }}</textarea>
+
+                </div>
+
+                <div class="col-md-3 mb-3">
+
+                    <label>Valor Serviços</label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="valor_servicos"
+                        value="{{ ordem.valor_servicos }}"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-3 mb-3">
+
+                    <label>Valor Peças</label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="valor_pecas"
+                        value="{{ ordem.valor_pecas }}"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-3 mb-3">
+
+                    <label>Desconto</label>
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="desconto"
+                        value="{{ ordem.desconto }}"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-3 mb-3">
+
+                    <label>Status</label>
+
+                    <select
+                        name="status"
+                        class="form-control">
+
+                        <option
+                            value="ABERTA"
+                            {% if ordem.status=="ABERTA" %}selected{% endif %}>
+
+                            ABERTA
+
+                        </option>
+
+                        <option
+                            value="FINALIZADA"
+                            {% if ordem.status=="FINALIZADA" %}selected{% endif %}>
+
+                            FINALIZADA
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <button
+                class="btn btn-success">
+
+                Salvar Alterações
+
+            </button>
+
+            <a
+                href="/ordens"
+                class="btn btn-secondary">
+
+                Cancelar
+
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

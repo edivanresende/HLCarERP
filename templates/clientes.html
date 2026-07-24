@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}
+Clientes
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <h2>Clientes</h2>
+
+        <a href="/clientes/novo" class="btn btn-warning">
+            Novo Cliente
+        </a>
+
+    </div>
+
+    <div class="card-dashboard">
+
+        <table class="table table-dark table-hover">
+
+            <thead>
+
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Telefone</th>
+                    <th>Cidade</th>
+                    <th>Ações</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for cliente in clientes %}
+
+                <tr>
+
+                    <td>{{ cliente.id }}</td>
+                    <td>{{ cliente.nome }}</td>
+                    <td>{{ cliente.cpf_cnpj }}</td>
+                    <td>{{ cliente.telefone }}</td>
+                    <td>{{ cliente.cidade }}</td>
+
+                    <td>
+
+                        <a href="/clientes/editar/{{ cliente.id }}"
+                           class="btn btn-sm btn-primary">
+                            Editar
+                        </a>
+
+                        <a href="/clientes/excluir/{{ cliente.id }}"
+                           class="btn btn-sm btn-danger"
+                           onclick="return confirm('Deseja realmente excluir este cliente?')">
+                            Excluir
+                        </a>
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

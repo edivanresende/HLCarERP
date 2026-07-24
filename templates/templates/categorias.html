@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+
+{% block title %}
+Categorias de Produtos
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            <h2 class="text-white">
+
+                <i class="fa fa-tags"></i>
+
+                Categorias de Produtos
+
+            </h2>
+
+            <small class="text-secondary">
+
+                Organize todos os produtos do estoque por categoria.
+
+            </small>
+
+        </div>
+
+        <div>
+
+            <a
+                href="/estoque"
+                class="btn btn-secondary"
+            >
+
+                <i class="fa fa-arrow-left"></i>
+
+                Voltar
+
+            </a>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow border-0 mb-4">
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <div class="col-md-8">
+
+                    <form method="GET">
+
+                        <div class="input-group">
+
+                            <span class="input-group-text">
+
+                                <i class="fa fa-search"></i>
+
+                            </span>
+
+                            <input
+                                type="text"
+                                name="pesquisa"
+                                class="form-control"
+                                placeholder="Pesquisar categoria..."
+                                value="{{ request.args.get('pesquisa','') }}"
+                            >
+
+                            <button
+                                class="btn btn-primary"
+                                type="submit"
+                            >
+
+                                Pesquisar
+
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+                <div class="col-md-4 text-end">
+
+                    <button
+                        class="btn btn-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalCategoria"
+                    >
+
+                        <i class="fa fa-plus"></i>
+
+                        Nova Categoria
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+        <div class="card shadow border-0">
+
+        <div class="card-header bg-dark text-white">
+
+            <h5 class="mb-0">
+
+                Lista de Categorias
+
+            </h5>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <table class="table table-dark table-hover align-middle mb-0">
+
+                <thead>
+
+                    <tr>
+
+                        <th width="80">
+
+                            ID
+
+                        </th>
+
+                        <th>
+
+                            Categoria
+
+                        </th>
+
+                        <th width="170">
+
+                            Produtos
+
+                        </th>
+
+                        <th width="180">
+
+                            Cadastro
+
+                        </th>
+
+                        <th width="120">
+
+                            Situação
+
+                        </th>
+
+                        <th width="180">
+
+                            Ações
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for categoria in categorias %}
+
+                    <tr>
+
+                        <td>
+
+                            {{ categoria.id }}
+
+                        </td>
+
+                        <td>
+
+                            <strong>
+
+                                {{ categoria.nome }}
+
+                            </strong>
+
+                        </td>
+
+                        <td>
+
+                            {{ categoria.produtos|length }}
+
+                        </td>
+
+                        <td>
+
+                            {% if categoria.criado_em %}
+
+                                {{ categoria.criado_em.strftime("%d/%m/%Y") }}
+
+                            {% else %}
+
+                                -
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            {% if categoria.ativo %}
+
+                                <span class="badge bg-success">
+
+                                    Ativa
+
+                                </span>
+
+                            {% else %}
+
+                                <span class="badge bg-danger">
+
+                                    Inativa
+
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            <button
+                                class="btn btn-primary btn-sm">
+
+                                <i class="fa fa-edit"></i>
+
+                            </button>
+
+                            <button
+                                class="btn btn-danger btn-sm">
+
+                                <i class="fa fa-trash"></i>
+
+                            </button>
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td
+                            colspan="6"
+                            class="text-center py-4 text-secondary">
+
+                            Nenhuma categoria cadastrada.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+        <!-- Modal Cadastro / Edição -->
+
+    <div
+        class="modal fade"
+        id="modalCategoria"
+        tabindex="-1"
+        aria-hidden="true">
+
+        <div class="modal-dialog">
+
+            <div class="modal-content bg-dark text-white">
+
+                <form
+                    method="POST"
+                    action="/categorias/salvar">
+
+                    <input
+                        type="hidden"
+                        name="id"
+                        id="categoria_id">
+
+                    <div class="modal-header">
+
+                        <h5 class="modal-title">
+
+                            <i class="fa fa-tags"></i>
+
+                            Categoria
+
+                        </h5>
+
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal">
+
+                        </button>
+
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+
+                                Nome da Categoria
+
+                            </label>
+
+                            <input
+                                type="text"
+                                name="nome"
+                                id="categoria_nome"
+                                class="form-control"
+                                maxlength="100"
+                                required>
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+
+                                Descrição
+
+                            </label>
+
+                            <textarea
+                                name="descricao"
+                                id="categoria_descricao"
+                                rows="4"
+                                class="form-control"
+                                placeholder="Descrição da categoria..."></textarea>
+
+                        </div>
+
+                        <div class="form-check form-switch">
+
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                id="categoria_ativa"
+                                name="ativo"
+                                checked>
+
+                            <label
+                                class="form-check-label"
+                                for="categoria_ativa">
+
+                                Categoria ativa
+
+                            </label>
+
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+
+                            Cancelar
+
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="btn btn-success">
+
+                            <i class="fa fa-save"></i>
+
+                            Salvar Categoria
+
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+    <script>
+
+function editarCategoria(id, nome, descricao, ativo){
+
+    document.getElementById("categoria_id").value = id;
+
+    document.getElementById("categoria_nome").value = nome;
+
+    document.getElementById("categoria_descricao").value = descricao || "";
+
+    document.getElementById("categoria_ativa").checked = ativo;
+
+    const modal = new bootstrap.Modal(
+        document.getElementById("modalCategoria")
+    );
+
+    modal.show();
+
+}
+
+function excluirCategoria(id, nome){
+
+    if(confirm(
+        "Deseja realmente excluir a categoria '" +
+        nome +
+        "'?"
+    )){
+
+        window.location.href =
+            "/categorias/excluir/" + id;
+
+    }
+
+}
+
+</script>
+
+<style>
+
+.card{
+
+    border-radius:12px;
+
+}
+
+.card-header{
+
+    font-weight:600;
+
+}
+
+.table th{
+
+    white-space:nowrap;
+
+}
+
+.table td{
+
+    vertical-align:middle;
+
+}
+
+.btn{
+
+    border-radius:8px;
+
+}
+
+.modal-content{
+
+    border-radius:12px;
+
+}
+
+.form-control{
+
+    border-radius:8px;
+
+}
+
+.form-check-input{
+
+    cursor:pointer;
+
+}
+
+</style>
+
+{% endblock %}

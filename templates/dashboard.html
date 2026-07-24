@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}
+Dashboard
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="row mb-4">
+
+        <div class="col">
+
+            <h2 class="text-white">
+                Dashboard
+            </h2>
+
+            <p class="text-secondary">
+                Bem-vindo ao <strong>HLCarERP</strong> - Sistema de Gestão da Oficina
+            </p>
+
+        </div>
+
+    </div>
+
+    <div class="row g-4">
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card-dashboard shadow">
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <div>
+
+                        <small class="text-secondary">
+                            Clientes
+                        </small>
+
+                        <h2 class="mt-2 fw-bold">
+
+                            {{ total_clientes }}
+
+                        </h2>
+
+                    </div>
+
+                    <div style="font-size:45px;color:#4f8cff">
+
+                        <i class="fa fa-users"></i>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card-dashboard shadow">
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <div>
+
+                        <small class="text-secondary">
+                            Veículos
+                        </small>
+
+                        <h2 class="mt-2 fw-bold">
+
+                            {{ total_veiculos }}
+
+                        </h2>
+
+                    </div>
+
+                    <div style="font-size:45px;color:#16a34a">
+
+                        <i class="fa fa-car"></i>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card-dashboard shadow">
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <div>
+
+                        <small class="text-secondary">
+                            Ordens de Serviço
+                        </small>
+
+                        <h2 class="mt-2 fw-bold">
+
+                            {{ total_os }}
+
+                        </h2>
+
+                    </div>
+
+                    <div style="font-size:45px;color:#f59e0b">
+
+                        <i class="fa fa-file-alt"></i>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card-dashboard shadow">
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <div>
+
+                        <small class="text-secondary">
+                            Faturamento
+                        </small>
+
+                        <h3 class="mt-2 fw-bold">
+
+                            R$ {{ "{:,.2f}".format(faturamento).replace(",", "X").replace(".", ",").replace("X",".") }}
+
+                        </h3>
+
+                    </div>
+
+                    <div style="font-size:45px;color:#22c55e">
+
+                        <i class="fa fa-dollar-sign"></i>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="row mt-5">
+
+        <div class="col-lg-8">
+
+            <div class="card-dashboard shadow">
+
+                <h4 class="mb-4">
+
+                    <i class="fa fa-chart-line"></i>
+
+                    Movimento da Oficina
+
+                </h4>
+                                <div style="height:350px;display:flex;align-items:center;justify-content:center;flex-direction:column">
+
+                    <i class="fa fa-chart-area mb-3"
+                       style="font-size:70px;color:#3b82f6;">
+                    </i>
+
+                    <h5 class="text-secondary">
+
+                        Em breve este gráfico exibirá:
+
+                    </h5>
+
+                    <ul class="text-secondary mt-3" style="line-height:35px;font-size:18px">
+
+                        <li>Faturamento diário</li>
+
+                        <li>Ordens de serviço por mês</li>
+
+                        <li>Serviços mais vendidos</li>
+
+                        <li>Comparativo mensal</li>
+
+                        <li>Meta x Realizado</li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+
+            <div class="card-dashboard shadow">
+
+                <h4 class="mb-4">
+
+                    <i class="fa fa-calendar-check"></i>
+
+                    Agenda do Dia
+
+                </h4>
+
+                <table class="table table-dark table-hover align-middle">
+
+                    <thead>
+
+                        <tr>
+
+                            <th width="30%">Hora</th>
+
+                            <th>Serviço</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        <tr>
+                            <td>08:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                        <tr>
+                            <td>09:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                        <tr>
+                            <td>10:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                        <tr>
+                            <td>11:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                        <tr>
+                            <td>13:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                        <tr>
+                            <td>14:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                        <tr>
+                            <td>15:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                        <tr>
+                            <td>16:00</td>
+                            <td>Disponível</td>
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="row mt-4">
+
+        <div class="col-lg-4">
+
+            <div class="card-dashboard shadow">
+
+                <h5>
+
+                    <i class="fa fa-tools"></i>
+
+                    Oficina
+
+                </h5>
+
+                <hr>
+
+                <p class="mb-2">
+                    🔧 Ordens em andamento
+                </p>
+
+                <h3>
+                    0
+                </h3>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+
+            <div class="card-dashboard shadow">
+
+                <h5>
+
+                    <i class="fa fa-boxes"></i>
+
+                    Estoque
+                </h5>
+
+                <hr>
+
+                <p class="mb-2">
+
+                    📦 Produtos com estoque baixo
+
+                </p>
+
+                <h3>
+
+                    0
+
+                </h3>
+
+            </div>
+
+        </div>
+                <div class="col-lg-4">
+
+            <div class="card-dashboard shadow">
+
+                <h5>
+
+                    <i class="fa fa-money-bill-wave"></i>
+
+                    Financeiro
+
+                </h5>
+
+                <hr>
+
+                <p class="mb-2">
+
+                    💰 Contas a Receber
+
+                </p>
+
+                <h3>
+
+                    R$ 0,00
+
+                </h3>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="row mt-4">
+
+        <div class="col-lg-6">
+
+            <div class="card-dashboard shadow">
+
+                <h5>
+
+                    <i class="fa fa-clock"></i>
+
+                    Últimas Ordens de Serviço
+
+                </h5>
+
+                <hr>
+
+                <div class="text-secondary text-center py-5">
+
+                    <i class="fa fa-file-alt mb-3"
+                       style="font-size:50px;"></i>
+
+                    <p>
+
+                        Nenhuma Ordem de Serviço cadastrada.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-6">
+
+            <div class="card-dashboard shadow">
+
+                <h5>
+
+                    <i class="fa fa-car-side"></i>
+
+                    Veículos em Atendimento
+
+                </h5>
+
+                <hr>
+
+                <div class="text-secondary text-center py-5">
+
+                    <i class="fa fa-car mb-3"
+                       style="font-size:50px;"></i>
+
+                    <p>
+
+                        Nenhum veículo em atendimento.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

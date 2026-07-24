@@ -1,0 +1,1069 @@
+{% extends "base.html" %}
+
+{% block title %}
+Compras
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            <h2 class="text-white">
+
+                <i class="fa fa-cart-shopping"></i>
+
+                Compras
+
+            </h2>
+
+            <small class="text-secondary">
+
+                Controle das compras de produtos e entrada de mercadorias no estoque.
+
+            </small>
+
+        </div>
+
+        <div>
+
+            <a
+                href="/estoque"
+                class="btn btn-secondary">
+
+                <i class="fa fa-arrow-left"></i>
+
+                Voltar
+
+            </a>
+
+            <a
+                href="/compras/nova"
+                class="btn btn-success">
+
+                <i class="fa fa-plus"></i>
+
+                Nova Compra
+
+            </a>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow border-0 mb-4">
+
+        <div class="card-body">
+
+            <div class="row g-3">
+
+                <div class="col-md-5">
+
+                    <label class="form-label">
+
+                        Pesquisar
+
+                    </label>
+
+                    <input
+                        type="text"
+                        class="form-control"
+                        placeholder="Fornecedor, número da nota ou observação..."
+                        id="pesquisaCompra">
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Situação
+
+                    </label>
+
+                    <select
+                        class="form-select"
+                        id="statusCompra">
+
+                        <option value="">
+
+                            Todas
+
+                        </option>
+
+                        <option value="ABERTA">
+
+                            Aberta
+
+                        </option>
+
+                        <option value="FINALIZADA">
+
+                            Finalizada
+
+                        </option>
+
+                        <option value="CANCELADA">
+
+                            Cancelada
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Data Inicial
+
+                    </label>
+
+                    <input
+                        type="date"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Data Final
+
+                    </label>
+
+                    <input
+                        type="date"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-1 d-grid">
+
+                    <label class="form-label">
+
+                        &nbsp;
+
+                    </label>
+
+                    <button
+                        class="btn btn-primary">
+
+                        <i class="fa fa-search"></i>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Compras
+
+                    </small>
+
+                    <h2>
+
+                        {{ total_compras }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Valor Comprado
+
+                    </small>
+
+                    <h2>
+
+                        R$
+                        {{ "%.2f"|format(valor_compras) }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Compras Abertas
+
+                    </small>
+
+                    <h2>
+
+                        {{ compras_abertas }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Fornecedores
+
+                    </small>
+
+                    <h2>
+
+                        {{ total_fornecedores }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow border-0">
+
+        <div class="card-header bg-dark text-white">
+
+            <h5 class="mb-0">
+
+                Compras Cadastradas
+
+            </h5>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <table
+                class="table table-dark table-hover align-middle mb-0">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Nº</th>
+
+                        <th>Fornecedor</th>
+
+                        <th>Data</th>
+
+                        <th>Nota Fiscal</th>
+
+                        <th>Total</th>
+
+                        <th>Status</th>
+
+                        <th width="220">
+
+                            Ações
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+                    {% for compra in compras %}
+
+<tr>
+
+    <td>
+
+        <strong>
+
+            {{ compra.numero }}
+
+        </strong>
+
+    </td>
+
+    <td>
+
+        {% if compra.fornecedor %}
+
+            {{ compra.fornecedor.nome }}
+
+        {% else %}
+
+            -
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {% if compra.data_compra %}
+
+            {{ compra.data_compra.strftime("%d/%m/%Y") }}
+
+        {% else %}
+
+            -
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {{ compra.numero_nota or "-" }}
+
+    </td>
+
+    <td>
+
+        <strong class="text-success">
+
+            R$
+            {{ "%.2f"|format(compra.valor_total) }}
+
+        </strong>
+
+    </td>
+
+    <td>
+
+        {% if compra.status == "ABERTA" %}
+
+            <span class="badge bg-warning text-dark">
+
+                ABERTA
+
+            </span>
+
+        {% elif compra.status == "FINALIZADA" %}
+
+            <span class="badge bg-success">
+
+                FINALIZADA
+
+            </span>
+
+        {% elif compra.status == "CANCELADA" %}
+
+            <span class="badge bg-danger">
+
+                CANCELADA
+
+            </span>
+
+        {% else %}
+
+            <span class="badge bg-secondary">
+
+                {{ compra.status }}
+
+            </span>
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        <div class="btn-group btn-group-sm">
+
+            <a
+                href="/compras/{{ compra.id }}"
+                class="btn btn-info"
+                title="Visualizar">
+
+                <i class="fa fa-eye"></i>
+
+            </a>
+
+            <a
+                href="/compras/editar/{{ compra.id }}"
+                class="btn btn-primary"
+                title="Editar">
+
+                <i class="fa fa-edit"></i>
+
+            </a>
+
+            {% if compra.status == "ABERTA" %}
+
+            <a
+                href="/compras/finalizar/{{ compra.id }}"
+                class="btn btn-success"
+                title="Finalizar"
+                onclick="return confirm('Deseja finalizar esta compra?')">
+
+                <i class="fa fa-check"></i>
+
+            </a>
+
+            <a
+                href="/compras/cancelar/{{ compra.id }}"
+                class="btn btn-warning"
+                title="Cancelar"
+                onclick="return confirm('Deseja cancelar esta compra?')">
+
+                <i class="fa fa-ban"></i>
+
+            </a>
+
+            {% endif %}
+
+            <a
+                href="/compras/excluir/{{ compra.id }}"
+                class="btn btn-danger"
+                title="Excluir"
+                onclick="return confirm('Deseja realmente excluir esta compra?')">
+
+                <i class="fa fa-trash"></i>
+
+            </a>
+
+        </div>
+
+    </td>
+
+</tr>
+
+{% else %}
+
+<tr>
+
+    <td
+        colspan="7"
+        class="text-center py-5 text-secondary">
+
+        <i class="fa fa-cart-shopping fa-3x mb-3"></i>
+
+        <h5>
+
+            Nenhuma compra cadastrada.
+
+        </h5>
+
+        <p>
+
+            Clique em <strong>Nova Compra</strong> para registrar sua primeira compra.
+
+        </p>
+
+    </td>
+
+</tr>
+
+{% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+    <!-- ==========================================================
+         MODAL NOVA COMPRA
+    =========================================================== -->
+
+    <div
+        class="modal fade"
+        id="modalCompra"
+        tabindex="-1"
+        aria-hidden="true">
+
+        <div class="modal-dialog modal-xl">
+
+            <div class="modal-content bg-dark text-white">
+
+                <form
+                    method="POST"
+                    action="/compras/salvar">
+
+                    <input
+                        type="hidden"
+                        name="id"
+                        id="compra_id">
+
+                    <div class="modal-header">
+
+                        <h5 class="modal-title">
+
+                            <i class="fa fa-cart-shopping"></i>
+
+                            Cadastro de Compra
+
+                        </h5>
+
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal">
+
+                        </button>
+
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="row g-3">
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+
+                                    Fornecedor
+
+                                </label>
+
+                                <select
+                                    class="form-select"
+                                    name="fornecedor_id"
+                                    id="fornecedor_id"
+                                    required>
+
+                                    <option value="">
+
+                                        Selecione...
+
+                                    </option>
+
+                                    {% for fornecedor in fornecedores %}
+
+                                    <option value="{{ fornecedor.id }}">
+
+                                        {{ fornecedor.nome }}
+
+                                    </option>
+
+                                    {% endfor %}
+
+                                </select>
+
+                            </div>
+
+                            <div class="col-md-3">
+
+                                <label class="form-label">
+
+                                    Data da Compra
+
+                                </label>
+
+                                <input
+                                    type="date"
+                                    class="form-control"
+                                    name="data_compra"
+                                    required>
+
+                            </div>
+
+                            <div class="col-md-3">
+
+                                <label class="form-label">
+
+                                    Nº Nota Fiscal
+
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    name="numero_nota">
+
+                            </div>
+
+                            <div class="col-md-3">
+
+                                <label class="form-label">
+
+                                    Frete
+
+                                </label>
+
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value="0.00"
+                                    class="form-control"
+                                    id="frete"
+                                    name="frete">
+
+                            </div>
+
+                            <div class="col-md-3">
+
+                                <label class="form-label">
+
+                                    Desconto
+
+                                </label>
+
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value="0.00"
+                                    class="form-control"
+                                    id="desconto"
+                                    name="desconto">
+
+                            </div>
+
+                            <div class="col-md-3">
+
+                                <label class="form-label">
+
+                                    Outras Despesas
+
+                                </label>
+
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value="0.00"
+                                    class="form-control"
+                                    id="outras_despesas"
+                                    name="outras_despesas">
+
+                            </div>
+
+                            <div class="col-md-3">
+
+                                <label class="form-label">
+
+                                    Total da Compra
+
+                                </label>
+
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    class="form-control"
+                                    id="valor_total"
+                                    name="valor_total"
+                                    readonly>
+
+                            </div>
+
+                        </div>
+
+                        <hr>
+
+                        <h5>
+
+                            Produtos da Compra
+
+                        </h5>
+
+                        <div class="table-responsive">
+
+                            <table
+                                class="table table-dark table-bordered align-middle">
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th width="90">
+
+                                            Código
+
+                                        </th>
+
+                                        <th>
+
+                                            Produto
+
+                                        </th>
+
+                                        <th width="120">
+
+                                            Quantidade
+
+                                        </th>
+
+                                        <th width="140">
+
+                                            Valor Unitário
+
+                                        </th>
+
+                                        <th width="140">
+
+                                            Subtotal
+
+                                        </th>
+
+                                        <th width="70">
+
+                                            Ação
+
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody id="itensCompra">
+
+                                    <!-- Produtos serão adicionados via JavaScript -->
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn btn-primary mt-2"
+                            id="btnAdicionarProduto">
+
+                            <i class="fa fa-plus"></i>
+
+                            Adicionar Produto
+
+                        </button>
+
+                        <hr>
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+
+                                Observações
+
+                            </label>
+
+                            <textarea
+                                class="form-control"
+                                rows="4"
+                                name="observacoes"></textarea>
+
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+
+                            Cancelar
+
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="btn btn-success">
+
+                            <i class="fa fa-save"></i>
+
+                            Salvar Compra
+
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+    <script>
+
+function editarCompra(id){
+
+    window.location.href =
+        "/compras/editar/" + id;
+
+}
+
+function excluirCompra(id){
+
+    if(confirm("Deseja realmente excluir esta compra?")){
+
+        window.location.href =
+            "/compras/excluir/" + id;
+
+    }
+
+}
+
+// =======================================
+// ADICIONAR PRODUTO
+// =======================================
+
+document
+.getElementById("btnAdicionarProduto")
+.addEventListener("click", function(){
+
+    let tbody = document.getElementById("itensCompra");
+
+    let linha = document.createElement("tr");
+
+    linha.innerHTML = `
+
+        <td>
+
+            <input
+                type="text"
+                class="form-control"
+                name="codigo[]">
+
+        </td>
+
+        <td>
+
+            <input
+                type="text"
+                class="form-control"
+                name="produto[]">
+
+        </td>
+
+        <td>
+
+            <input
+                type="number"
+                step="0.001"
+                min="0"
+                value="1"
+                class="form-control quantidade">
+
+        </td>
+
+        <td>
+
+            <input
+                type="number"
+                step="0.01"
+                min="0"
+                value="0.00"
+                class="form-control valor">
+
+        </td>
+
+        <td>
+
+            <input
+                type="number"
+                step="0.01"
+                class="form-control subtotal"
+                readonly>
+
+        </td>
+
+        <td class="text-center">
+
+            <button
+                type="button"
+                class="btn btn-danger btn-sm remover">
+
+                <i class="fa fa-trash"></i>
+
+            </button>
+
+        </td>
+
+    `;
+
+    tbody.appendChild(linha);
+
+    atualizarEventos();
+
+});
+
+
+// =======================================
+// EVENTOS
+// =======================================
+
+function atualizarEventos(){
+
+    document.querySelectorAll(".quantidade").forEach(function(campo){
+
+        campo.oninput = calcularTotais;
+
+    });
+
+    document.querySelectorAll(".valor").forEach(function(campo){
+
+        campo.oninput = calcularTotais;
+
+    });
+
+    document.querySelectorAll(".remover").forEach(function(botao){
+
+        botao.onclick = function(){
+
+            this.closest("tr").remove();
+
+            calcularTotais();
+
+        };
+
+    });
+
+}
+
+
+// =======================================
+// CALCULAR TOTAIS
+// =======================================
+
+function calcularTotais(){
+
+    let total = 0;
+
+    document.querySelectorAll("#itensCompra tr").forEach(function(linha){
+
+        let qtd = parseFloat(
+            linha.querySelector(".quantidade").value
+        ) || 0;
+
+        let valor = parseFloat(
+            linha.querySelector(".valor").value
+        ) || 0;
+
+        let subtotal = qtd * valor;
+
+        linha.querySelector(".subtotal").value =
+            subtotal.toFixed(2);
+
+        total += subtotal;
+
+    });
+
+    let frete = parseFloat(
+        document.getElementById("frete").value
+    ) || 0;
+
+    let desconto = parseFloat(
+        document.getElementById("desconto").value
+    ) || 0;
+
+    let outras = parseFloat(
+        document.getElementById("outras_despesas").value
+    ) || 0;
+
+    total = total + frete + outras - desconto;
+
+    document.getElementById("valor_total").value =
+        total.toFixed(2);
+
+}
+
+document.getElementById("frete").oninput = calcularTotais;
+document.getElementById("desconto").oninput = calcularTotais;
+document.getElementById("outras_despesas").oninput = calcularTotais;
+
+</script>
+
+<style>
+
+.card{
+
+    border-radius:12px;
+
+}
+
+.card-header{
+
+    font-weight:600;
+
+}
+
+.table td{
+
+    vertical-align:middle;
+
+}
+
+.table th{
+
+    white-space:nowrap;
+
+}
+
+.btn{
+
+    border-radius:8px;
+
+}
+
+.modal-content{
+
+    border-radius:12px;
+
+}
+
+.form-control,
+.form-select{
+
+    border-radius:8px;
+
+}
+
+.table-responsive{
+
+    max-height:450px;
+
+}
+
+</style>
+
+{% endblock %}

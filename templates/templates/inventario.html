@@ -1,0 +1,979 @@
+{% extends "base.html" %}
+
+{% block title %}
+Inventário
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            <h2 class="text-white">
+
+                <i class="fa fa-clipboard-check"></i>
+
+                Inventário de Estoque
+
+            </h2>
+
+            <small class="text-secondary">
+
+                Conferência física e ajuste do estoque da HL Car Auto Center.
+
+            </small>
+
+        </div>
+
+        <div>
+
+            <a
+                href="/estoque"
+                class="btn btn-secondary">
+
+                <i class="fa fa-arrow-left"></i>
+
+                Voltar
+
+            </a>
+
+            <button
+                class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#modalInventario">
+
+                <i class="fa fa-plus"></i>
+
+                Novo Inventário
+
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow border-0 mb-4">
+
+        <div class="card-body">
+
+            <div class="row g-3">
+
+                <div class="col-md-4">
+
+                    <label class="form-label">
+
+                        Pesquisar
+
+                    </label>
+
+                    <input
+                        type="text"
+                        id="pesquisaInventario"
+                        class="form-control"
+                        placeholder="Número, responsável ou observação">
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Situação
+
+                    </label>
+
+                    <select
+                        class="form-select"
+                        id="statusInventario">
+
+                        <option value="">
+
+                            Todos
+
+                        </option>
+
+                        <option value="ABERTO">
+
+                            Aberto
+
+                        </option>
+
+                        <option value="FINALIZADO">
+
+                            Finalizado
+
+                        </option>
+
+                        <option value="CANCELADO">
+
+                            Cancelado
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Data Inicial
+
+                    </label>
+
+                    <input
+                        type="date"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Data Final
+
+                    </label>
+
+                    <input
+                        type="date"
+                        class="form-control">
+
+                </div>
+
+                <div class="col-md-2 d-grid">
+
+                    <label class="form-label">
+
+                        &nbsp;
+
+                    </label>
+
+                    <button
+                        class="btn btn-primary">
+
+                        <i class="fa fa-search"></i>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Inventários
+
+                    </small>
+
+                    <h2>
+
+                        {{ total_inventarios }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Em Aberto
+
+                    </small>
+
+                    <h2>
+
+                        {{ inventarios_abertos }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Finalizados
+
+                    </small>
+
+                    <h2>
+
+                        {{ inventarios_finalizados }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-3">
+
+            <div class="card shadow border-0">
+
+                <div class="card-body">
+
+                    <small class="text-secondary">
+
+                        Divergências
+
+                    </small>
+
+                    <h2>
+
+                        {{ total_divergencias }}
+
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow border-0">
+
+        <div class="card-header bg-dark text-white">
+
+            <h5 class="mb-0">
+
+                Inventários Realizados
+
+            </h5>
+
+        </div>
+
+        <div class="card-body p-0">
+
+            <table
+                class="table table-dark table-hover align-middle mb-0">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Nº</th>
+
+                        <th>Data</th>
+
+                        <th>Responsável</th>
+
+                        <th>Produtos</th>
+
+                        <th>Divergências</th>
+
+                        <th>Status</th>
+
+                        <th width="220">
+
+                            Ações
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+                    {% for inventario in inventarios %}
+
+<tr>
+
+    <td>
+
+        <strong>
+
+            {{ inventario.numero }}
+
+        </strong>
+
+    </td>
+
+    <td>
+
+        {% if inventario.data_inventario %}
+
+            {{ inventario.data_inventario.strftime("%d/%m/%Y") }}
+
+        {% else %}
+
+            -
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {% if inventario.usuario %}
+
+            {{ inventario.usuario.nome }}
+
+        {% else %}
+
+            -
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {{ inventario.itens|length }}
+
+    </td>
+
+    <td>
+
+        {% if inventario.divergencias > 0 %}
+
+            <span class="badge bg-danger">
+
+                {{ inventario.divergencias }}
+
+            </span>
+
+        {% else %}
+
+            <span class="badge bg-success">
+
+                0
+
+            </span>
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        {% if inventario.status == "ABERTO" %}
+
+            <span class="badge bg-warning text-dark">
+
+                ABERTO
+
+            </span>
+
+        {% elif inventario.status == "FINALIZADO" %}
+
+            <span class="badge bg-success">
+
+                FINALIZADO
+
+            </span>
+
+        {% elif inventario.status == "CANCELADO" %}
+
+            <span class="badge bg-danger">
+
+                CANCELADO
+
+            </span>
+
+        {% else %}
+
+            <span class="badge bg-secondary">
+
+                {{ inventario.status }}
+
+            </span>
+
+        {% endif %}
+
+    </td>
+
+    <td>
+
+        <div class="btn-group btn-group-sm">
+
+            <a
+                href="/inventario/{{ inventario.id }}"
+                class="btn btn-info"
+                title="Visualizar">
+
+                <i class="fa fa-eye"></i>
+
+            </a>
+
+            <a
+                href="/inventario/editar/{{ inventario.id }}"
+                class="btn btn-primary"
+                title="Editar">
+
+                <i class="fa fa-edit"></i>
+
+            </a>
+
+            {% if inventario.status == "ABERTO" %}
+
+            <a
+                href="/inventario/finalizar/{{ inventario.id }}"
+                class="btn btn-success"
+                title="Finalizar"
+                onclick="return confirm('Deseja finalizar este inventário?')">
+
+                <i class="fa fa-check"></i>
+
+            </a>
+
+            <a
+                href="/inventario/cancelar/{{ inventario.id }}"
+                class="btn btn-warning"
+                title="Cancelar"
+                onclick="return confirm('Deseja cancelar este inventário?')">
+
+                <i class="fa fa-ban"></i>
+
+            </a>
+
+            {% endif %}
+
+            <a
+                href="/inventario/excluir/{{ inventario.id }}"
+                class="btn btn-danger"
+                title="Excluir"
+                onclick="return confirm('Deseja realmente excluir este inventário?')">
+
+                <i class="fa fa-trash"></i>
+
+            </a>
+
+        </div>
+
+    </td>
+
+</tr>
+
+{% else %}
+
+<tr>
+
+    <td
+        colspan="7"
+        class="text-center py-5 text-secondary">
+
+        <i class="fa fa-clipboard-check fa-3x mb-3"></i>
+
+        <h5>
+
+            Nenhum inventário cadastrado.
+
+        </h5>
+
+        <p>
+
+            Clique em <strong>Novo Inventário</strong> para iniciar a conferência do estoque.
+
+        </p>
+
+    </td>
+
+</tr>
+
+{% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+    <!-- ==========================================================
+         MODAL NOVO INVENTÁRIO
+    =========================================================== -->
+
+    <div
+        class="modal fade"
+        id="modalInventario"
+        tabindex="-1"
+        aria-hidden="true">
+
+        <div class="modal-dialog modal-xl">
+
+            <div class="modal-content bg-dark text-white">
+
+                <form
+                    method="POST"
+                    action="/inventario/salvar">
+
+                    <input
+                        type="hidden"
+                        name="id"
+                        id="inventario_id">
+
+                    <div class="modal-header">
+
+                        <h5 class="modal-title">
+
+                            <i class="fa fa-clipboard-check"></i>
+
+                            Inventário de Estoque
+
+                        </h5>
+
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal">
+
+                        </button>
+
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="row g-3">
+
+                            <div class="col-md-3">
+
+                                <label class="form-label">
+
+                                    Data
+
+                                </label>
+
+                                <input
+                                    type="date"
+                                    class="form-control"
+                                    name="data_inventario"
+                                    required>
+
+                            </div>
+
+                            <div class="col-md-4">
+
+                                <label class="form-label">
+
+                                    Responsável
+
+                                </label>
+
+                                <select
+                                    class="form-select"
+                                    name="usuario_id"
+                                    required>
+
+                                    <option value="">
+
+                                        Selecione...
+
+                                    </option>
+
+                                    {% for usuario in usuarios %}
+
+                                    <option value="{{ usuario.id }}">
+
+                                        {{ usuario.nome }}
+
+                                    </option>
+
+                                    {% endfor %}
+
+                                </select>
+
+                            </div>
+
+                            <div class="col-md-5">
+
+                                <label class="form-label">
+
+                                    Observações
+
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    name="observacoes">
+
+                            </div>
+
+                        </div>
+
+                        <hr>
+
+                        <h5>
+
+                            Produtos Conferidos
+
+                        </h5>
+
+                        <div class="table-responsive">
+
+                            <table
+                                class="table table-dark table-bordered align-middle">
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th width="90">
+
+                                            Código
+
+                                        </th>
+
+                                        <th>
+
+                                            Produto
+
+                                        </th>
+
+                                        <th width="120">
+
+                                            Sistema
+
+                                        </th>
+
+                                        <th width="120">
+
+                                            Contado
+
+                                        </th>
+
+                                        <th width="120">
+
+                                            Diferença
+
+                                        </th>
+
+                                        <th width="70">
+
+                                            Ação
+
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody id="itensInventario">
+
+                                    <!-- Linhas adicionadas via JavaScript -->
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn btn-primary mt-2"
+                            id="btnAdicionarProdutoInventario">
+
+                            <i class="fa fa-plus"></i>
+
+                            Adicionar Produto
+
+                        </button>
+
+                    </div>
+
+                    <div class="modal-footer">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+
+                            Cancelar
+
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="btn btn-success">
+
+                            <i class="fa fa-save"></i>
+
+                            Salvar Inventário
+
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+    <script>
+
+// =======================================
+// VISUALIZAR / EDITAR / EXCLUIR
+// =======================================
+
+function visualizarInventario(id){
+
+    window.location.href =
+        "/inventario/" + id;
+
+}
+
+function editarInventario(id){
+
+    window.location.href =
+        "/inventario/editar/" + id;
+
+}
+
+function excluirInventario(id){
+
+    if(confirm("Deseja realmente excluir este inventário?")){
+
+        window.location.href =
+            "/inventario/excluir/" + id;
+
+    }
+
+}
+
+
+// =======================================
+// ADICIONAR PRODUTO
+// =======================================
+
+document
+.getElementById("btnAdicionarProdutoInventario")
+.addEventListener("click", function(){
+
+    let tbody = document.getElementById("itensInventario");
+
+    let linha = document.createElement("tr");
+
+    linha.innerHTML = `
+
+        <td>
+
+            <input
+                type="text"
+                class="form-control"
+                name="codigo[]">
+
+        </td>
+
+        <td>
+
+            <input
+                type="text"
+                class="form-control"
+                name="produto[]">
+
+        </td>
+
+        <td>
+
+            <input
+                type="number"
+                step="0.001"
+                class="form-control estoqueSistema"
+                value="0"
+                readonly>
+
+        </td>
+
+        <td>
+
+            <input
+                type="number"
+                step="0.001"
+                class="form-control estoqueContado"
+                value="0">
+
+        </td>
+
+        <td>
+
+            <input
+                type="number"
+                step="0.001"
+                class="form-control diferenca"
+                readonly>
+
+        </td>
+
+        <td class="text-center">
+
+            <button
+                type="button"
+                class="btn btn-danger btn-sm remover">
+
+                <i class="fa fa-trash"></i>
+
+            </button>
+
+        </td>
+
+    `;
+
+    tbody.appendChild(linha);
+
+    atualizarEventosInventario();
+
+});
+
+
+// =======================================
+// EVENTOS
+// =======================================
+
+function atualizarEventosInventario(){
+
+    document
+    .querySelectorAll(".estoqueContado")
+    .forEach(function(campo){
+
+        campo.oninput = calcularDiferencas;
+
+    });
+
+    document
+    .querySelectorAll(".remover")
+    .forEach(function(botao){
+
+        botao.onclick = function(){
+
+            this.closest("tr").remove();
+
+            calcularDiferencas();
+
+        };
+
+    });
+
+}
+
+
+// =======================================
+// CALCULAR DIFERENÇAS
+// =======================================
+
+function calcularDiferencas(){
+
+    document
+    .querySelectorAll("#itensInventario tr")
+    .forEach(function(linha){
+
+        let sistema = parseFloat(
+            linha.querySelector(".estoqueSistema").value
+        ) || 0;
+
+        let contado = parseFloat(
+            linha.querySelector(".estoqueContado").value
+        ) || 0;
+
+        let diferenca = contado - sistema;
+
+        linha.querySelector(".diferenca").value =
+            diferenca.toFixed(3);
+
+    });
+
+}
+
+</script>
+
+<style>
+
+.card{
+
+    border-radius:12px;
+
+}
+
+.card-header{
+
+    font-weight:600;
+
+}
+
+.table td{
+
+    vertical-align:middle;
+
+}
+
+.table th{
+
+    white-space:nowrap;
+
+}
+
+.btn{
+
+    border-radius:8px;
+
+}
+
+.modal-content{
+
+    border-radius:12px;
+
+}
+
+.form-control,
+.form-select{
+
+    border-radius:8px;
+
+}
+
+.table-responsive{
+
+    max-height:450px;
+
+}
+
+.badge{
+
+    font-size:13px;
+
+}
+
+</style>
+
+{% endblock %}
