@@ -708,7 +708,10 @@ class Produto(db.Model):
         Numeric(18,3),
         default=0
     )
-
+    preco_compra = db.Column(
+    Numeric(18,2),
+    default=0
+)
     preco_venda = db.Column(
         Numeric(18,2),
         default=0
