@@ -9,848 +9,287 @@ Estoque
 <div class="container-fluid">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
-
         <div>
-
             <h2 class="text-white mb-1">
                 <i class="fa fa-boxes"></i>
                 Controle de Estoque
             </h2>
-
             <small class="text-secondary">
                 Gerenciamento completo de produtos, fornecedores e movimentações.
             </small>
-
         </div>
-
         <div>
-
             <a href="/produtos/novo" class="btn btn-warning">
-
                 <i class="fa fa-plus"></i>
-
                 Novo Produto
-
             </a>
-
         </div>
-
     </div>
 
-    <!-- ===========================
-         DASHBOARD
-    ============================ -->
-
+    <!-- DASHBOARD -->
     <div class="row g-3 mb-4">
-
         <div class="col-lg-3">
-
             <div class="card border-0 shadow h-100">
-
                 <div class="card-body">
-
                     <div class="d-flex justify-content-between">
-
                         <div>
-
-                            <small class="text-secondary">
-
-                                Produtos
-
-                            </small>
-
-                            <h2 class="mt-2">
-
-                                {{ total_produtos }}
-
-                            </h2>
-
+                            <small class="text-secondary">Produtos</small>
+                            <h2 class="mt-2">{{ total_produtos }}</h2>
                         </div>
-
                         <div>
-
                             <i class="fa fa-box fa-3x text-warning"></i>
-
                         </div>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
         <div class="col-lg-3">
-
             <div class="card border-0 shadow h-100">
-
                 <div class="card-body">
-
                     <div class="d-flex justify-content-between">
-
                         <div>
-
-                            <small class="text-secondary">
-
-                                Valor em Estoque
-
-                            </small>
-
+                            <small class="text-secondary">Valor em Estoque</small>
                             <h2 class="mt-2">
-
-                                R$
-                                {{ "%.2f"|format(valor_total_estoque) }}
-
+                                R$ {{ "%.2f"|format(valor_total_estoque or 0) }}
                             </h2>
-
                         </div>
-
                         <div>
-
                             <i class="fa fa-dollar-sign fa-3x text-success"></i>
-
                         </div>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
         <div class="col-lg-3">
-
             <div class="card border-0 shadow h-100">
-
                 <div class="card-body">
-
                     <div class="d-flex justify-content-between">
-
                         <div>
-
-                            <small class="text-secondary">
-
-                                Estoque Baixo
-
-                            </small>
-
-                            <h2 class="mt-2 text-danger">
-
-                                {{ estoque_baixo }}
-
-                            </h2>
-
+                            <small class="text-secondary">Estoque Baixo</small>
+                            <h2 class="mt-2 text-danger">{{ estoque_baixo or 0 }}</h2>
                         </div>
-
                         <div>
-
                             <i class="fa fa-triangle-exclamation fa-3x text-danger"></i>
-
                         </div>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
         <div class="col-lg-3">
-
             <div class="card border-0 shadow h-100">
-
                 <div class="card-body">
-
                     <div class="d-flex justify-content-between">
-
                         <div>
-
-                            <small class="text-secondary">
-
-                                Categorias
-
-                            </small>
-
-                            <h2 class="mt-2">
-
-                                {{ total_categorias }}
-
-                            </h2>
-
+                            <small class="text-secondary">Categorias</small>
+                            <h2 class="mt-2">{{ total_categorias or 0 }}</h2>
                         </div>
-
                         <div>
-
                             <i class="fa fa-tags fa-3x text-primary"></i>
-
                         </div>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
-
     </div>
-        <!-- ===========================
-         BARRA DE FERRAMENTAS
-    ============================ -->
 
+    <!-- BARRA DE FERRAMENTAS -->
     <div class="card border-0 shadow mb-4">
-
         <div class="card-body">
-
             <div class="row g-3 align-items-end">
-
                 <div class="col-lg-4">
-
-                    <label class="form-label">
-
-                        Pesquisar Produto
-
-                    </label>
-
-                    <input
-                        type="text"
-                        class="form-control"
-                        id="pesquisaProduto"
-                        placeholder="Descrição, código ou código de barras..."
-                    >
-
+                    <label class="form-label">Pesquisar Produto</label>
+                    <input type="text" class="form-control" id="pesquisaProduto"
+                           placeholder="Descrição, código ou código de barras...">
                 </div>
-
                 <div class="col-lg-2">
-
-                    <label class="form-label">
-
-                        Categoria
-
-                    </label>
-
-                    <select
-                        class="form-select"
-                        id="categoriaFiltro"
-                    >
-
-                        <option value="">
-
-                            Todas
-
-                        </option>
-
+                    <label class="form-label">Categoria</label>
+                    <select class="form-select" id="categoriaFiltro">
+                        <option value="">Todas</option>
                         {% for categoria in categorias %}
-
-                        <option
-                            value="{{ categoria.id }}"
-                        >
-
-                            {{ categoria.descricao }}
-
+                        <option value="{{ categoria.id }}">
+                            {{ categoria.nome or categoria.descricao or '-' }}
                         </option>
-
                         {% endfor %}
-
                     </select>
-
                 </div>
-
                 <div class="col-lg-2">
-
-                    <label class="form-label">
-
-                        Fabricante
-
-                    </label>
-
-                    <select
-                        class="form-select"
-                        id="fabricanteFiltro"
-                    >
-
-                        <option value="">
-
-                            Todos
-
-                        </option>
-
+                    <label class="form-label">Fabricante</label>
+                    <select class="form-select" id="fabricanteFiltro">
+                        <option value="">Todos</option>
                         {% for fabricante in fabricantes %}
-
-                        <option
-                            value="{{ fabricante.id }}"
-                        >
-
-                            {{ fabricante.nome }}
-
-                        </option>
-
+                        <option value="{{ fabricante.id }}">{{ fabricante.nome }}</option>
                         {% endfor %}
-
                     </select>
-
                 </div>
-
                 <div class="col-lg-2">
-
-                    <label class="form-label">
-
-                        Situação
-
-                    </label>
-
-                    <select
-                        class="form-select"
-                        id="situacaoFiltro"
-                    >
-
-                        <option value="">
-
-                            Todas
-
-                        </option>
-
-                        <option value="1">
-
-                            Ativos
-
-                        </option>
-
-                        <option value="0">
-
-                            Inativos
-
-                        </option>
-
+                    <label class="form-label">Situação</label>
+                    <select class="form-select" id="situacaoFiltro">
+                        <option value="">Todas</option>
+                        <option value="1">Ativos</option>
+                        <option value="0">Inativos</option>
                     </select>
-
                 </div>
-
                 <div class="col-lg-2 d-grid">
-
-                    <button
-                        class="btn btn-primary"
-                    >
-
+                    <button class="btn btn-primary" type="button">
                         <i class="fa fa-search"></i>
-
                         Pesquisar
-
                     </button>
-
                 </div>
-
             </div>
-
         </div>
-
     </div>
 
-    <!-- ===========================
-         MENU RÁPIDO
-    ============================ -->
-
+    <!-- MENU RÁPIDO -->
     <div class="row g-3 mb-4">
-
         <div class="col-lg-2 d-grid">
-
-            <a
-                href="/categorias"
-                class="btn btn-outline-warning"
-            >
-
-                <i class="fa fa-tags"></i>
-
-                Categorias
-
+            <a href="/categorias" class="btn btn-outline-warning">
+                <i class="fa fa-tags"></i> Categorias
             </a>
-
         </div>
-
         <div class="col-lg-2 d-grid">
-
-            <a
-                href="/fabricantes"
-                class="btn btn-outline-primary"
-            >
-
-                <i class="fa fa-industry"></i>
-
-                Fabricantes
-
+            <a href="/fabricantes" class="btn btn-outline-primary">
+                <i class="fa fa-industry"></i> Fabricantes
             </a>
-
         </div>
-
         <div class="col-lg-2 d-grid">
-
-            <a
-                href="/fornecedores"
-                class="btn btn-outline-success"
-            >
-
-                <i class="fa fa-truck"></i>
-
-                Fornecedores
-
+            <a href="/fornecedores" class="btn btn-outline-success">
+                <i class="fa fa-truck"></i> Fornecedores
             </a>
-
         </div>
-
         <div class="col-lg-2 d-grid">
-
-            <a
-                href="/compras"
-                class="btn btn-outline-info"
-            >
-
-                <i class="fa fa-cart-shopping"></i>
-
-                Compras
-
+            <a href="/compras" class="btn btn-outline-info">
+                <i class="fa fa-cart-shopping"></i> Compras
             </a>
-
         </div>
-
         <div class="col-lg-2 d-grid">
-
-            <a
-                href="/inventario"
-                class="btn btn-outline-danger"
-            >
-
-                <i class="fa fa-clipboard-check"></i>
-
-                Inventário
-
+            <a href="/inventario" class="btn btn-outline-danger">
+                <i class="fa fa-clipboard-check"></i> Inventário
             </a>
-
         </div>
-
         <div class="col-lg-2 d-grid">
-
-            <a
-                href="/movimentacoes"
-                class="btn btn-outline-secondary"
-            >
-
-                <i class="fa fa-right-left"></i>
-
-                Movimentações
-
+            <a href="/movimentacoes" class="btn btn-outline-secondary">
+                <i class="fa fa-right-left"></i> Movimentações
             </a>
-
         </div>
-
     </div>
 
-    <!-- ===========================
-         ALERTAS
-    ============================ -->
-
-    {% if produtos_criticos %}
-
-    <div class="alert alert-danger shadow-sm">
-
-        <h5>
-
-            <i class="fa fa-triangle-exclamation"></i>
-
-            Atenção
-
-        </h5>
-
-        Existem produtos abaixo do estoque mínimo.
-
-    </div>
-
-    {% endif %}
-
-    <!-- ===========================
-         TABELA DE PRODUTOS
-    ============================ -->
-
+    <!-- TABELA -->
     <div class="card border-0 shadow">
-
         <div class="card-body">
-
             <div class="table-responsive">
-
-                <table
-                    class="table table-hover align-middle"
-                    id="tabelaProdutos"
-                >
-
+                <table class="table table-hover align-middle" id="tabelaProdutos">
                     <thead class="table-dark">
-
                         <tr>
-
                             <th>Código</th>
-
                             <th>Descrição</th>
-
                             <th>Categoria</th>
-
                             <th>Fabricante</th>
-
-                            <th>Fornecedor</th>
-
                             <th>Estoque</th>
-
                             <th>Mínimo</th>
-
                             <th>Custo</th>
-
                             <th>Venda</th>
-
-                            <th width="240">
-
-                                Ações
-
-                            </th>
-
+                            <th width="220">Ações</th>
                         </tr>
-
                     </thead>
-
                     <tbody>
-                        {% for produto in produtos %}
-
-<tr>
-
-    <td>
-
-        <strong>
-
-            {{ produto.codigo }}
-
-        </strong>
-
-    </td>
-
-    <td>
-
-        <div>
-
-            <strong>
-
-                {{ produto.descricao }}
-
-            </strong>
-
-            {% if produto.codigo_barras %}
-
-            <br>
-
-            <small class="text-secondary">
-
-                {{ produto.codigo_barras }}
-
-            </small>
-
-            {% endif %}
-
-        </div>
-
-    </td>
-
-    <td>
-
-        {% if produto.categoria %}
-
-            {{ produto.categoria.descricao }}
-
-        {% else %}
-
-            -
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {% if produto.fabricante %}
-
-            {{ produto.fabricante.nome }}
-
-        {% else %}
-
-            -
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {% if produto.fornecedor_principal %}
-
-            {{ produto.fornecedor_principal.nome }}
-
-        {% else %}
-
-            -
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {% if produto.estoque_atual <= produto.estoque_minimo %}
-
-            <span class="badge bg-danger">
-
-                {{ "%.2f"|format(produto.estoque_atual) }}
-
-            </span>
-
-        {% else %}
-
-            <span class="badge bg-success">
-
-                {{ "%.2f"|format(produto.estoque_atual) }}
-
-            </span>
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {{ "%.2f"|format(produto.estoque_minimo) }}
-
-    </td>
-
-    <td>
-
-        R$
-        {{ "%.2f"|format(produto.valor_custo) }}
-
-    </td>
-
-    <td>
-
-        <strong class="text-success">
-
-            R$
-            {{ "%.2f"|format(produto.valor_venda) }}
-
-        </strong>
-
-    </td>
-
-    <td>
-
-        <div class="btn-group btn-group-sm">
-
-            <a
-                href="/produtos/editar/{{ produto.id }}"
-                class="btn btn-primary"
-                title="Editar"
-            >
-
-                <i class="fa fa-pen"></i>
-
-            </a>
-
-            <a
-                href="/movimentacoes/entrada/{{ produto.id }}"
-                class="btn btn-success"
-                title="Entrada"
-            >
-
-                <i class="fa fa-arrow-down"></i>
-
-            </a>
-
-            <a
-                href="/movimentacoes/saida/{{ produto.id }}"
-                class="btn btn-warning"
-                title="Saída"
-            >
-
-                <i class="fa fa-arrow-up"></i>
-
-            </a>
-
-            <a
-                href="/movimentacoes/{{ produto.id }}"
-                class="btn btn-info"
-                title="Histórico"
-            >
-
-                <i class="fa fa-clock-rotate-left"></i>
-
-            </a>
-
-            <a
-                href="/produtos/excluir/{{ produto.id }}"
-                class="btn btn-danger"
-                onclick="return confirm('Deseja realmente excluir este produto?')"
-                title="Excluir"
-            >
-
-                <i class="fa fa-trash"></i>
-
-            </a>
-
-        </div>
-
-    </td>
-
-</tr>
-
-{% endfor %}
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-</div>
-{% if produtos|length == 0 %}
-
-<tr>
-
-    <td colspan="10" class="text-center text-secondary py-5">
-
-        <i class="fa fa-box-open fa-4x mb-3"></i>
-
-        <h5>
-
-            Nenhum produto cadastrado.
-
-        </h5>
-
-        <p>
-
-            Clique em <strong>Novo Produto</strong> para iniciar o estoque.
-
-        </p>
-
-    </td>
-
-</tr>
-
-{% endif %}
-
+                    {% for produto in produtos %}
+                        <tr>
+                            <td><strong>{{ produto.codigo or '-' }}</strong></td>
+                            <td>
+                                <strong>{{ produto.descricao }}</strong>
+                                {% if produto.codigo_barras %}
+                                <br><small class="text-secondary">{{ produto.codigo_barras }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if produto.categoria %}
+                                    {{ produto.categoria.nome or produto.categoria.descricao or '-' }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if produto.fabricante %}
+                                    {{ produto.fabricante.nome }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set qtd = produto.estoque_atual or 0 %}
+                                {% set minimo = produto.estoque_minimo or 0 %}
+                                {% if qtd <= minimo %}
+                                    <span class="badge bg-danger">{{ "%.2f"|format(qtd) }}</span>
+                                {% else %}
+                                    <span class="badge bg-success">{{ "%.2f"|format(qtd) }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(produto.estoque_minimo or 0) }}</td>
+                            <td>
+                                R$ {{ "%.2f"|format(produto.preco_compra or 0) }}
+                            </td>
+                            <td>
+                                <strong class="text-success">
+                                    R$ {{ "%.2f"|format(produto.preco_venda or 0) }}
+                                </strong>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/produtos/editar/{{ produto.id }}" class="btn btn-primary" title="Editar">
+                                        <i class="fa fa-pen"></i>
+                                    </a>
+                                    <a href="/movimentacoes" class="btn btn-success" title="Movimentações">
+                                        <i class="fa fa-right-left"></i>
+                                    </a>
+                                    <a href="/produtos/excluir/{{ produto.id }}"
+                                       class="btn btn-danger"
+                                       onclick="return confirm('Deseja realmente excluir este produto?')"
+                                       title="Excluir">
+                                        <i class="fa fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-secondary py-5">
+                                <i class="fa fa-box-open fa-4x mb-3"></i>
+                                <h5>Nenhum produto cadastrado.</h5>
+                                <p>Clique em <strong>Novo Produto</strong> para iniciar o estoque.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
                     </tbody>
-
                 </table>
-
             </div>
-
         </div>
-
     </div>
 
 </div>
 
 <script>
-
 const pesquisa = document.getElementById("pesquisaProduto");
-
-pesquisa.addEventListener("keyup", function(){
-
-    let filtro = pesquisa.value.toUpperCase();
-
-    let tabela = document.getElementById("tabelaProdutos");
-
-    let linhas = tabela.getElementsByTagName("tr");
-
-    for(let i=1;i<linhas.length;i++){
-
-        let texto = linhas[i].innerText.toUpperCase();
-
-        if(texto.indexOf(filtro)>-1){
-
-            linhas[i].style.display="";
-
-        }else{
-
-            linhas[i].style.display="none";
-
+if (pesquisa) {
+    pesquisa.addEventListener("keyup", function () {
+        let filtro = pesquisa.value.toUpperCase();
+        let tabela = document.getElementById("tabelaProdutos");
+        let linhas = tabela.getElementsByTagName("tr");
+        for (let i = 1; i < linhas.length; i++) {
+            let texto = linhas[i].innerText.toUpperCase();
+            linhas[i].style.display = (texto.indexOf(filtro) > -1) ? "" : "none";
         }
-
-    }
-
-});
-
-</script>
-
-<script>
-
-const situacao = document.getElementById("situacaoFiltro");
-
-situacao.addEventListener("change", function(){
-
-    console.log("Filtro de situação:", this.value);
-
-});
-
-const categoria = document.getElementById("categoriaFiltro");
-
-categoria.addEventListener("change", function(){
-
-    console.log("Categoria:", this.value);
-
-});
-
-const fabricante = document.getElementById("fabricanteFiltro");
-
-fabricante.addEventListener("change", function(){
-
-    console.log("Fabricante:", this.value);
-
-});
-
+    });
+}
 </script>
 
 <style>
-
-.table td{
-
-    vertical-align:middle;
-
-}
-
-.table tbody tr:hover{
-
-    background:#fff8e8;
-
-    transition:.2s;
-
-}
-
-.card{
-
-    border-radius:12px;
-
-}
-
-.btn{
-
-    border-radius:8px;
-
-}
-
-.badge{
-
-    font-size:13px;
-
-    padding:7px 10px;
-
-}
-
+.table td { vertical-align: middle; }
+.card { border-radius: 12px; }
+.btn { border-radius: 8px; }
+.badge { font-size: 13px; padding: 7px 10px; }
 </style>
 
 {% endblock %}

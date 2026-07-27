@@ -9,649 +9,204 @@ Novo Produto
 <div class="container-fluid">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
-
         <div>
-
             <h2 class="text-white">
-
                 <i class="fa fa-box-open"></i>
-
                 Cadastro de Produto
-
             </h2>
-
             <small class="text-secondary">
-
                 Cadastre produtos para utilização em vendas, compras e Ordens de Serviço.
-
             </small>
-
         </div>
-
         <div>
-
-            <a
-                href="/estoque"
-                class="btn btn-secondary"
-            >
-
+            <a href="/estoque" class="btn btn-secondary">
                 <i class="fa fa-arrow-left"></i>
-
                 Voltar
-
             </a>
-
         </div>
-
     </div>
 
-    <form
-        method="POST"
-        action=""
-    >
+    {% if erro %}
+    <div class="alert alert-danger">
+        <strong>Erro ao salvar:</strong> {{ erro }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="">
 
         <div class="card shadow border-0 mb-4">
-
             <div class="card-header bg-dark text-white">
-
-                <h5 class="mb-0">
-
-                    Dados do Produto
-
-                </h5>
-
+                <h5 class="mb-0">Dados do Produto</h5>
             </div>
-
             <div class="card-body">
-
                 <div class="row g-3">
-
                     <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Código
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="codigo"
-                            class="form-control"
-                            required
-                        >
-
+                        <label class="form-label">Código</label>
+                        <input type="text" name="codigo" class="form-control" required>
                     </div>
-
                     <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Código de Barras
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="codigo_barras"
-                            class="form-control"
-                        >
-
+                        <label class="form-label">Código de Barras</label>
+                        <input type="text" name="codigo_barras" class="form-control">
                     </div>
-
                     <div class="col-md-6">
-
-                        <label class="form-label">
-
-                            Descrição
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="descricao"
-                            class="form-control"
-                            required
-                        >
-
+                        <label class="form-label">Descrição</label>
+                        <input type="text" name="descricao" class="form-control" required>
                     </div>
-
                     <div class="col-md-6">
-
-                        <label class="form-label">
-
-                            Descrição Reduzida
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="descricao_reduzida"
-                            class="form-control"
-                        >
-
+                        <label class="form-label">Descrição Reduzida</label>
+                        <input type="text" name="descricao_reduzida" class="form-control">
                     </div>
-
                     <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Referência
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="referencia"
-                            class="form-control"
-                        >
-
+                        <label class="form-label">Referência</label>
+                        <input type="text" name="referencia" class="form-control">
                     </div>
-
                     <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Unidade
-
-                        </label>
-
-                        <select
-                            name="unidade"
-                            class="form-select"
-                        >
-
+                        <label class="form-label">Unidade</label>
+                        <select name="unidade" class="form-select">
                             <option value="UN">UN</option>
                             <option value="PC">PC</option>
                             <option value="CX">CX</option>
                             <option value="LT">LT</option>
                             <option value="KG">KG</option>
-
                         </select>
-
                     </div>
-
                 </div>
-
             </div>
-
-        </div>
-                <div class="card shadow border-0 mb-4">
-
-            <div class="card-header bg-dark text-white">
-
-                <h5 class="mb-0">
-
-                    Classificação do Produto
-
-                </h5>
-
-            </div>
-
-            <div class="card-body">
-
-                <div class="row g-3">
-
-                    <div class="col-md-4">
-
-                        <label class="form-label">
-
-                            Categoria
-
-                        </label>
-
-                        <select
-                            name="categoria_id"
-                            class="form-select"
-                            required
-                        >
-
-                            <option value="">
-
-                                Selecione...
-
-                            </option>
-
-                            {% for categoria in categorias %}
-
-                            <option value="{{ categoria.id }}">
-
-                                {{ categoria.nome }}
-
-                            </option>
-
-                            {% endfor %}
-
-                        </select>
-
-                    </div>
-
-                    <div class="col-md-4">
-
-                        <label class="form-label">
-
-                            Fabricante
-
-                        </label>
-
-                        <select
-                            name="fabricante_id"
-                            class="form-select"
-                        >
-
-                            <option value="">
-
-                                Selecione...
-
-                            </option>
-
-                            {% for fabricante in fabricantes %}
-
-                            <option value="{{ fabricante.id }}">
-
-                                {{ fabricante.nome }}
-
-                            </option>
-
-                            {% endfor %}
-
-                        </select>
-
-                    </div>
-
-                    <div class="col-md-4">
-
-                        <label class="form-label">
-
-                            Localização
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="localizacao"
-                            class="form-control"
-                            placeholder="Ex.: Prateleira A1"
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            NCM
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="ncm"
-                            class="form-control"
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            CEST
-
-                        </label>
-
-                        <input
-                            type="text"
-                            name="cest"
-                            class="form-control"
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Peso (kg)
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            name="peso"
-                            class="form-control"
-                            value="0"
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Situação
-
-                        </label>
-
-                        <select
-                            name="ativo"
-                            class="form-select"
-                        >
-
-                            <option value="1">
-
-                                Ativo
-
-                            </option>
-
-                            <option value="0">
-
-                                Inativo
-
-                            </option>
-
-                        </select>
-
-                    </div>
-
-                </div>
-
-                <hr>
-
-                <div class="row">
-
-                    <div class="col-md-4">
-
-                        <div class="form-check">
-
-                            <input
-                                class="form-check-input"
-                                type="checkbox"
-                                id="controla_estoque"
-                                name="controla_estoque"
-                                checked
-                            >
-
-                            <label
-                                class="form-check-label"
-                                for="controla_estoque"
-                            >
-
-                                Controla Estoque
-
-                            </label>
-
-                        </div>
-
-                    </div>
-
-                    <div class="col-md-4">
-
-                        <div class="form-check">
-
-                            <input
-                                class="form-check-input"
-                                type="checkbox"
-                                id="permite_venda"
-                                name="permite_venda"
-                                checked
-                            >
-
-                            <label
-                                class="form-check-label"
-                                for="permite_venda"
-                            >
-
-                                Permite Venda
-
-                            </label>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-                <div class="card shadow border-0 mb-4">
-
-            <div class="card-header bg-dark text-white">
-
-                <h5 class="mb-0">
-
-                    Estoque e Valores
-
-                </h5>
-
-            </div>
-
-            <div class="card-body">
-
-                <div class="row g-3">
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Estoque Atual
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            name="estoque_atual"
-                            class="form-control"
-                            value="0"
-                            required
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Estoque Mínimo
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            name="estoque_minimo"
-                            class="form-control"
-                            value="0"
-                            required
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Estoque Máximo
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            name="estoque_maximo"
-                            class="form-control"
-                            value="0"
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Unidade
-
-                        </label>
-
-                        <input
-                            type="text"
-                            class="form-control"
-                            value="UN"
-                            readonly
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Preço de Compra
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            name="preco_compra"
-                            class="form-control"
-                            value="0.00"
-                            required
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Preço de Venda
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            name="preco_venda"
-                            class="form-control"
-                            value="0.00"
-                            required
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Margem (%)
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            name="margem_padrao"
-                            class="form-control"
-                            value="0"
-                        >
-
-                    </div>
-
-                    <div class="col-md-3">
-
-                        <label class="form-label">
-
-                            Comissão (%)
-
-                        </label>
-
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            name="comissao"
-                            class="form-control"
-                            value="0"
-                        >
-
-                    </div>
-
-                </div>
-
-            </div>
-
         </div>
 
         <div class="card shadow border-0 mb-4">
-
             <div class="card-header bg-dark text-white">
-
-                <h5 class="mb-0">
-
-                    Observações
-
-                </h5>
-
+                <h5 class="mb-0">Classificação do Produto</h5>
             </div>
-
             <div class="card-body">
-
-                <textarea
-                    name="observacoes"
-                    rows="5"
-                    class="form-control"
-                    placeholder="Informações adicionais do produto..."
-                ></textarea>
-
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Categoria</label>
+                        <select name="categoria_id" class="form-select" required>
+                            {% if categorias %}
+                                {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}" {% if loop.first %}selected{% endif %}>
+                                    {{ categoria.nome }}
+                                </option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="1" selected>Geral</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Fabricante</label>
+                        <select name="fabricante_id" class="form-select">
+                            <option value="">Selecione...</option>
+                            {% for fabricante in fabricantes %}
+                            <option value="{{ fabricante.id }}">{{ fabricante.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Localização</label>
+                        <input type="text" name="localizacao" class="form-control" placeholder="Ex.: Prateleira A1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">NCM</label>
+                        <input type="text" name="ncm" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">CEST</label>
+                        <input type="text" name="cest" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Peso (kg)</label>
+                        <input type="number" step="0.001" min="0" name="peso" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Situação</label>
+                        <select name="ativo" class="form-select">
+                            <option value="1">Ativo</option>
+                            <option value="0">Inativo</option>
+                        </select>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="controla_estoque" name="controla_estoque" checked>
+                            <label class="form-check-label" for="controla_estoque">Controla Estoque</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="permite_venda" name="permite_venda" checked>
+                            <label class="form-check-label" for="permite_venda">Permite Venda</label>
+                        </div>
+                    </div>
+                </div>
             </div>
-
         </div>
-                <div class="d-flex justify-content-end gap-2 mb-4">
 
-            <a
-                href="/estoque"
-                class="btn btn-secondary"
-            >
+        <div class="card shadow border-0 mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Estoque e Valores</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Estoque Atual</label>
+                        <input type="number" step="0.001" min="0" name="estoque_atual" class="form-control" value="0" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Estoque Mínimo</label>
+                        <input type="number" step="0.001" min="0" name="estoque_minimo" class="form-control" value="0" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Estoque Máximo</label>
+                        <input type="number" step="0.001" min="0" name="estoque_maximo" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Unidade</label>
+                        <input type="text" class="form-control" value="UN" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Preço de Compra</label>
+                        <input type="number" step="0.01" min="0" name="preco_compra" class="form-control" value="0.00" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Preço de Venda</label>
+                        <input type="number" step="0.01" min="0" name="preco_venda" class="form-control" value="0.00" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Margem (%)</label>
+                        <input type="number" step="0.01" min="0" name="margem_padrao" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Comissão (%)</label>
+                        <input type="number" step="0.01" min="0" name="comissao" class="form-control" value="0">
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                <i class="fa fa-times"></i>
+        <div class="card shadow border-0 mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Observações</h5>
+            </div>
+            <div class="card-body">
+                <textarea name="observacoes" rows="5" class="form-control"
+                          placeholder="Informações adicionais do produto..."></textarea>
+            </div>
+        </div>
 
-                Cancelar
-
+        <div class="d-flex justify-content-end gap-2 mb-4">
+            <a href="/estoque" class="btn btn-secondary">
+                <i class="fa fa-times"></i> Cancelar
             </a>
-
-            <button
-                type="reset"
-                class="btn btn-warning"
-            >
-
-                <i class="fa fa-eraser"></i>
-
-                Limpar
-
+            <button type="reset" class="btn btn-warning">
+                <i class="fa fa-eraser"></i> Limpar
             </button>
-
-            <button
-                type="submit"
-                class="btn btn-success"
-            >
-
-                <i class="fa fa-save"></i>
-
-                Salvar Produto
-
+            <button type="submit" class="btn btn-success">
+                <i class="fa fa-save"></i> Salvar Produto
             </button>
-
         </div>
 
     </form>
@@ -659,68 +214,22 @@ Novo Produto
 </div>
 
 <script>
-
 const compra = document.querySelector('[name="preco_compra"]');
 const venda = document.querySelector('[name="preco_venda"]');
 const margem = document.querySelector('[name="margem_padrao"]');
 
-function calcularMargem(){
-
+function calcularMargem() {
     let pc = parseFloat(compra.value) || 0;
     let pv = parseFloat(venda.value) || 0;
-
-    if(pc > 0){
-
-        let lucro = ((pv - pc) / pc) * 100;
-
-        margem.value = lucro.toFixed(2);
-
-    }else{
-
+    if (pc > 0) {
+        margem.value = (((pv - pc) / pc) * 100).toFixed(2);
+    } else {
         margem.value = "0.00";
-
     }
-
 }
 
 compra.addEventListener("input", calcularMargem);
 venda.addEventListener("input", calcularMargem);
-
 </script>
-
-<style>
-
-.card{
-
-    border-radius:12px;
-
-}
-
-.card-header{
-
-    font-weight:600;
-
-}
-
-.form-label{
-
-    font-weight:600;
-
-}
-
-.form-control,
-.form-select{
-
-    border-radius:8px;
-
-}
-
-.btn{
-
-    border-radius:8px;
-
-}
-
-</style>
 
 {% endblock %}

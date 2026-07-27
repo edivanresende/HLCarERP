@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Offline - HLCarERP</title>
+    <style>
+        body { margin: 0; font-family: Segoe UI, sans-serif; }
+        .offline-page {
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: #111827; color: #e5e7eb; text-align: center; padding: 30px;
+        }
+        .offline-page h1 { color: #ff6b00; font-size: 2rem; margin-bottom: 10px; }
+        .offline-page p { max-width: 400px; line-height: 1.6; margin-bottom: 20px; }
+        .btn-retry {
+            background: #ff6b00; color: white; border: none;
+            padding: 12px 28px; border-radius: 8px; font-size: 16px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-page">
+        <h1>HLCarERP</h1>
+        <p>
+            Você está <strong>sem conexão</strong>.<br>
+            As alterações feitas offline serão enviadas automaticamente quando a internet voltar.
+        </p>
+        <button class="btn-retry" onclick="location.reload()">Tentar novamente</button>
+    </div>
+</body>
+</html>

@@ -9,871 +9,268 @@ Fornecedores
 <div class="container-fluid">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
-
         <div>
-
             <h2 class="text-white">
-
                 <i class="fa fa-truck"></i>
-
                 Fornecedores
-
             </h2>
-
             <small class="text-secondary">
-
                 Cadastro completo de fornecedores do estoque da HL Car Auto Center.
-
             </small>
-
         </div>
-
         <div>
-
-            <a
-                href="/estoque"
-                class="btn btn-secondary">
-
+            <a href="/estoque" class="btn btn-secondary">
                 <i class="fa fa-arrow-left"></i>
-
                 Voltar
-
             </a>
-
         </div>
-
     </div>
 
     <div class="card shadow border-0 mb-4">
-
         <div class="card-body">
-
             <div class="row">
-
                 <div class="col-md-8">
-
                     <form method="GET">
-
                         <div class="input-group">
-
-                            <span class="input-group-text">
-
-                                <i class="fa fa-search"></i>
-
-                            </span>
-
-                            <input
-                                type="text"
-                                name="pesquisa"
-                                class="form-control"
-                                placeholder="Pesquisar fornecedor..."
-                                value="{{ request.args.get('pesquisa','') }}"
-                            >
-
-                            <button
-                                class="btn btn-primary">
-
-                                Pesquisar
-
-                            </button>
-
+                            <span class="input-group-text"><i class="fa fa-search"></i></span>
+                            <input type="text" name="pesquisa" class="form-control"
+                                   placeholder="Pesquisar fornecedor..."
+                                   value="{{ request.args.get('pesquisa','') }}">
+                            <button class="btn btn-primary" type="submit">Pesquisar</button>
                         </div>
-
                     </form>
-
                 </div>
-
                 <div class="col-md-4 text-end">
-
-                    <button
-                        class="btn btn-success"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalFornecedor">
-
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalFornecedor">
                         <i class="fa fa-plus"></i>
-
                         Novo Fornecedor
-
                     </button>
-
                 </div>
-
             </div>
-
         </div>
-
     </div>
 
     <div class="card shadow border-0">
-
         <div class="card-header bg-dark text-white">
-
-            <h5 class="mb-0">
-
-                Lista de Fornecedores
-
-            </h5>
-
+            <h5 class="mb-0">Lista de Fornecedores</h5>
         </div>
-
         <div class="card-body p-0">
-
-            <table
-                class="table table-dark table-hover align-middle mb-0">
-
+            <table class="table table-dark table-hover align-middle mb-0">
                 <thead>
-
                     <tr>
-
-                        <th width="80">
-
-                            ID
-
-                        </th>
-
-                        <th>
-
-                            Empresa
-
-                        </th>
-
-                        <th>
-
-                            Contato
-
-                        </th>
-
-                        <th>
-
-                            Cidade
-
-                        </th>
-
-                        <th width="140">
-
-                            Telefone
-
-                        </th>
-
-                        <th width="120">
-
-                            Situação
-
-                        </th>
-
-                        <th width="180">
-
-                            Ações
-
-                        </th>
-
+                        <th width="80">ID</th>
+                        <th>Empresa</th>
+                        <th>Contato</th>
+                        <th>Cidade</th>
+                        <th width="140">Telefone</th>
+                        <th width="120">Situação</th>
+                        <th width="180">Ações</th>
                     </tr>
-
                 </thead>
-
                 <tbody>
-                    {% for fornecedor in fornecedores %}
-
-<tr>
-
-    <td>
-
-        {{ fornecedor.id }}
-
-    </td>
-
-    <td>
-
-        <strong>
-
-            {{ fornecedor.nome }}
-
-        </strong>
-
-        {% if fornecedor.nome_fantasia %}
-
-        <br>
-
-        <small class="text-secondary">
-
-            {{ fornecedor.nome_fantasia }}
-
-        </small>
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {% if fornecedor.contato %}
-
-            {{ fornecedor.contato }}
-
-        {% else %}
-
-            -
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {% if fornecedor.cidade %}
-
-            {{ fornecedor.cidade }}
-
-            /
-
-            {{ fornecedor.estado }}
-
-        {% else %}
-
-            -
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {% if fornecedor.whatsapp %}
-
-            {{ fornecedor.whatsapp }}
-
-        {% elif fornecedor.telefone %}
-
-            {{ fornecedor.telefone }}
-
-        {% else %}
-
-            -
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        {% if fornecedor.ativo %}
-
-            <span class="badge bg-success">
-
-                Ativo
-
-            </span>
-
-        {% else %}
-
-            <span class="badge bg-danger">
-
-                Inativo
-
-            </span>
-
-        {% endif %}
-
-    </td>
-
-    <td>
-
-        <button
-            class="btn btn-primary btn-sm"
-            onclick="editarFornecedor(
-                '{{ fornecedor.id }}'
-            )">
-
-            <i class="fa fa-edit"></i>
-
-        </button>
-
-        <button
-            class="btn btn-danger btn-sm"
-            onclick="excluirFornecedor(
-                '{{ fornecedor.id }}',
-                '{{ fornecedor.nome }}'
-            )">
-
-            <i class="fa fa-trash"></i>
-
-        </button>
-
-    </td>
-
-</tr>
-
-{% else %}
-
-<tr>
-
-    <td
-        colspan="7"
-        class="text-center py-5 text-secondary">
-
-        <i class="fa fa-truck fa-3x mb-3"></i>
-
-        <h5>
-
-            Nenhum fornecedor cadastrado.
-
-        </h5>
-
-        <p>
-
-            Clique em <strong>Novo Fornecedor</strong> para iniciar o cadastro.
-
-        </p>
-
-    </td>
-
-</tr>
-
-{% endfor %}
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-</div>
-    <!-- ==========================================
-         MODAL CADASTRO / EDIÇÃO DE FORNECEDOR
-    =========================================== -->
-
-    <div
-        class="modal fade"
-        id="modalFornecedor"
-        tabindex="-1"
-        aria-hidden="true">
-
-        <div class="modal-dialog modal-xl">
-
-            <div class="modal-content bg-dark text-white">
-
-                <form
-                    method="POST"
-                    action="/fornecedores/salvar">
-
-                    <input
-                        type="hidden"
-                        name="id"
-                        id="fornecedor_id">
-
-                    <div class="modal-header">
-
-                        <h5 class="modal-title">
-
-                            <i class="fa fa-truck"></i>
-
-                            Cadastro de Fornecedor
-
-                        </h5>
-
-                        <button
-                            type="button"
-                            class="btn-close btn-close-white"
-                            data-bs-dismiss="modal">
-
-                        </button>
-
-                    </div>
-
-                    <div class="modal-body">
-
-                        <div class="row g-3">
-
-                            <div class="col-md-6">
-
-                                <label class="form-label">
-
-                                    Razão Social
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="nome"
-                                    id="fornecedor_nome"
-                                    required>
-
-                            </div>
-
-                            <div class="col-md-6">
-
-                                <label class="form-label">
-
-                                    Nome Fantasia
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="nome_fantasia"
-                                    id="fornecedor_nome_fantasia">
-
-                            </div>
-
-                            <div class="col-md-4">
-
-                                <label class="form-label">
-
-                                    CNPJ
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="cnpj"
-                                    id="fornecedor_cnpj">
-
-                            </div>
-
-                            <div class="col-md-4">
-
-                                <label class="form-label">
-
-                                    Inscrição Estadual
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="inscricao_estadual"
-                                    id="fornecedor_ie">
-
-                            </div>
-
-                            <div class="col-md-4">
-
-                                <label class="form-label">
-
-                                    Contato
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="contato"
-                                    id="fornecedor_contato">
-
-                            </div>
-
-                            <div class="col-md-4">
-
-                                <label class="form-label">
-
-                                    WhatsApp
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="whatsapp"
-                                    id="fornecedor_whatsapp">
-
-                            </div>
-
-                            <div class="col-md-4">
-
-                                <label class="form-label">
-
-                                    Telefone
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="telefone"
-                                    id="fornecedor_telefone">
-
-                            </div>
-
-                            <div class="col-md-4">
-
-                                <label class="form-label">
-
-                                    E-mail
-
-                                </label>
-
-                                <input
-                                    type="email"
-                                    class="form-control"
-                                    name="email"
-                                    id="fornecedor_email">
-
-                            </div>
-
-                            <div class="col-md-6">
-
-                                <label class="form-label">
-
-                                    Site
-
-                                </label>
-
-                                <input
-                                    type="url"
-                                    class="form-control"
-                                    name="site"
-                                    id="fornecedor_site">
-
-                            </div>
-
-                            <div class="col-md-6">
-
-                                <label class="form-label">
-
-                                    CEP
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="cep"
-                                    id="fornecedor_cep">
-
-                            </div>
-
-                            <div class="col-md-8">
-
-                                <label class="form-label">
-
-                                    Endereço
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="endereco"
-                                    id="fornecedor_endereco">
-
-                            </div>
-
-                            <div class="col-md-2">
-
-                                <label class="form-label">
-
-                                    Número
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="numero"
-                                    id="fornecedor_numero">
-
-                            </div>
-
-                            <div class="col-md-2">
-
-                                <label class="form-label">
-
-                                    Bairro
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="bairro"
-                                    id="fornecedor_bairro">
-
-                            </div>
-
-                            <div class="col-md-4">
-
-                                <label class="form-label">
-
-                                    Cidade
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    name="cidade"
-                                    id="fornecedor_cidade">
-
-                            </div>
-
-                            <div class="col-md-2">
-
-                                <label class="form-label">
-
-                                    UF
-
-                                </label>
-
-                                <input
-                                    type="text"
-                                    maxlength="2"
-                                    class="form-control"
-                                    name="estado"
-                                    id="fornecedor_estado">
-
-                            </div>
-
-                            <div class="col-md-6">
-
-                                <label class="form-label">
-
-                                    Observações
-
-                                </label>
-
-                                <textarea
-                                    class="form-control"
-                                    rows="3"
-                                    name="observacoes"
-                                    id="fornecedor_observacoes"></textarea>
-
-                            </div>
-
-                            <div class="col-md-12">
-
-                                <div class="form-check form-switch">
-
-                                    <input
-                                        class="form-check-input"
-                                        type="checkbox"
-                                        id="fornecedor_ativo"
-                                        name="ativo"
-                                        checked>
-
-                                    <label
-                                        class="form-check-label"
-                                        for="fornecedor_ativo">
-
-                                        Fornecedor ativo
-
-                                    </label>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                    <div class="modal-footer">
-
-                        <button
-                            type="button"
-                            class="btn btn-secondary"
-                            data-bs-dismiss="modal">
-
-                            Cancelar
-
-                        </button>
-
-                        <button
-                            type="submit"
-                            class="btn btn-success">
-
-                            <i class="fa fa-save"></i>
-
-                            Salvar Fornecedor
-
-                        </button>
-
-                    </div>
-
-                </form>
-
-            </div>
-
+                {% for fornecedor in fornecedores %}
+                    <tr>
+                        <td>{{ fornecedor.id }}</td>
+                        <td>
+                            <strong>{{ fornecedor.razao_social or fornecedor.nome_fantasia or '-' }}</strong>
+                            {% if fornecedor.nome_fantasia and fornecedor.razao_social %}
+                            <br>
+                            <small class="text-secondary">{{ fornecedor.nome_fantasia }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ fornecedor.contato or '-' }}</td>
+                        <td>
+                            {% if fornecedor.cidade %}
+                                {{ fornecedor.cidade }}{% if fornecedor.estado %} / {{ fornecedor.estado }}{% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ fornecedor.whatsapp or fornecedor.telefone or '-' }}
+                        </td>
+                        <td>
+                            {% if fornecedor.ativo is none or fornecedor.ativo %}
+                                <span class="badge bg-success">Ativo</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-danger btn-sm"
+                                onclick="excluirFornecedor({{ fornecedor.id }}, '{{ (fornecedor.razao_social or fornecedor.nome_fantasia or '')|e }}')">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-secondary">
+                            <i class="fa fa-truck fa-3x mb-3"></i>
+                            <h5>Nenhum fornecedor cadastrado.</h5>
+                            <p>Clique em <strong>Novo Fornecedor</strong> para iniciar o cadastro.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
-
     </div>
-    <script>
 
-function editarFornecedor(id){
+</div>
 
-    window.location.href =
-        "/fornecedores/editar/" + id;
+<!-- Modal Cadastro -->
+<div class="modal fade" id="modalFornecedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-white">
+            <form method="POST" action="/fornecedores/salvar">
+                <input type="hidden" name="id" id="fornecedor_id" value="">
 
-}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa fa-truck"></i>
+                        Cadastro de Fornecedor
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
 
-function excluirFornecedor(id, nome){
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Razão Social</label>
+                            <input type="text" class="form-control" name="razao_social" id="fornecedor_razao" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nome Fantasia</label>
+                            <input type="text" class="form-control" name="nome_fantasia" id="fornecedor_nome_fantasia">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">CNPJ</label>
+                            <input type="text" class="form-control" name="cnpj" id="fornecedor_cnpj">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Inscrição Estadual</label>
+                            <input type="text" class="form-control" name="inscricao_estadual" id="fornecedor_ie">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Contato</label>
+                            <input type="text" class="form-control" name="contato" id="fornecedor_contato">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">WhatsApp</label>
+                            <input type="text" class="form-control" name="whatsapp" id="fornecedor_whatsapp">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" class="form-control" name="telefone" id="fornecedor_telefone">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">E-mail</label>
+                            <input type="email" class="form-control" name="email" id="fornecedor_email">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Site</label>
+                            <input type="text" class="form-control" name="site" id="fornecedor_site">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CEP</label>
+                            <input type="text" class="form-control" name="cep" id="fornecedor_cep">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Endereço</label>
+                            <input type="text" class="form-control" name="endereco" id="fornecedor_endereco">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Número</label>
+                            <input type="text" class="form-control" name="numero" id="fornecedor_numero">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Bairro</label>
+                            <input type="text" class="form-control" name="bairro" id="fornecedor_bairro">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Cidade</label>
+                            <input type="text" class="form-control" name="cidade" id="fornecedor_cidade">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">UF</label>
+                            <input type="text" maxlength="2" class="form-control" name="estado" id="fornecedor_estado">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" rows="3" name="observacoes" id="fornecedor_observacoes"></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="fornecedor_ativo" name="ativo" checked>
+                                <label class="form-check-label" for="fornecedor_ativo">Fornecedor ativo</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    if(confirm(
-        "Deseja realmente excluir o fornecedor '" +
-        nome +
-        "'?"
-    )){
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fa fa-save"></i>
+                        Salvar Fornecedor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-        window.location.href =
-            "/fornecedores/excluir/" + id;
-
+<script>
+function excluirFornecedor(id, nome) {
+    if (confirm("Deseja realmente excluir o fornecedor '" + nome + "'?")) {
+        window.location.href = "/fornecedores/excluir/" + id;
     }
-
 }
 
-// ================================
-// Máscara CNPJ
-// ================================
-
-function mascaraCNPJ(campo){
-
-    let v = campo.value.replace(/\D/g,'');
-
-    v = v.replace(/^(\d{2})(\d)/,"$1.$2");
-    v = v.replace(/^(\d{2})\.(\d{3})(\d)/,"$1.$2.$3");
-    v = v.replace(/\.(\d{3})(\d)/,".$1/$2");
-    v = v.replace(/(\d{4})(\d)/,"$1-$2");
-
+function mascaraCNPJ(campo) {
+    let v = campo.value.replace(/\D/g, '');
+    v = v.replace(/^(\d{2})(\d)/, "$1.$2");
+    v = v.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
+    v = v.replace(/\.(\d{3})(\d)/, ".$1/$2");
+    v = v.replace(/(\d{4})(\d)/, "$1-$2");
     campo.value = v;
-
 }
 
-// ================================
-// Máscara CEP
-// ================================
-
-function mascaraCEP(campo){
-
-    let v = campo.value.replace(/\D/g,'');
-
-    v = v.replace(/^(\d{5})(\d)/,"$1-$2");
-
+function mascaraCEP(campo) {
+    let v = campo.value.replace(/\D/g, '');
+    v = v.replace(/^(\d{5})(\d)/, "$1-$2");
     campo.value = v;
-
 }
 
-// ================================
-// Máscara Telefone
-// ================================
-
-function mascaraTelefone(campo){
-
-    let v = campo.value.replace(/\D/g,'');
-
-    if(v.length <= 10){
-
-        v = v.replace(/^(\d{2})(\d)/g,"($1) $2");
-        v = v.replace(/(\d)(\d{4})$/,"$1-$2");
-
-    }else{
-
-        v = v.replace(/^(\d{2})(\d)/g,"($1) $2");
-        v = v.replace(/(\d)(\d{4})$/,"$1-$2");
-
+function mascaraTelefone(campo) {
+    let v = campo.value.replace(/\D/g, '');
+    if (v.length <= 10) {
+        v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+        v = v.replace(/(\d)(\d{4})$/, "$1-$2");
+    } else {
+        v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+        v = v.replace(/(\d)(\d{4})$/, "$1-$2");
     }
-
     campo.value = v;
-
 }
 
-// ================================
-// Eventos
-// ================================
-
-document
-.getElementById("fornecedor_cnpj")
-.addEventListener("keyup", function(){
-
-    mascaraCNPJ(this);
-
-});
-
-document
-.getElementById("fornecedor_cep")
-.addEventListener("keyup", function(){
-
-    mascaraCEP(this);
-
-});
-
-document
-.getElementById("fornecedor_telefone")
-.addEventListener("keyup", function(){
-
-    mascaraTelefone(this);
-
-});
-
-document
-.getElementById("fornecedor_whatsapp")
-.addEventListener("keyup", function(){
-
-    mascaraTelefone(this);
-
-});
-
+document.getElementById("fornecedor_cnpj").addEventListener("keyup", function () { mascaraCNPJ(this); });
+document.getElementById("fornecedor_cep").addEventListener("keyup", function () { mascaraCEP(this); });
+document.getElementById("fornecedor_telefone").addEventListener("keyup", function () { mascaraTelefone(this); });
+document.getElementById("fornecedor_whatsapp").addEventListener("keyup", function () { mascaraTelefone(this); });
 </script>
 
 <style>
-
-.card{
-
-    border-radius:12px;
-
-}
-
-.card-header{
-
-    font-weight:600;
-
-}
-
-.table td{
-
-    vertical-align:middle;
-
-}
-
-.table th{
-
-    white-space:nowrap;
-
-}
-
-.btn{
-
-    border-radius:8px;
-
-}
-
-.modal-content{
-
-    border-radius:12px;
-
-}
-
-.form-control{
-
-    border-radius:8px;
-
-}
-
-.form-check-input{
-
-    cursor:pointer;
-
-}
-
-.badge{
-
-    font-size:13px;
-
-}
-
+.card { border-radius: 12px; }
+.card-header { font-weight: 600; }
+.table td { vertical-align: middle; }
+.table th { white-space: nowrap; }
+.btn { border-radius: 8px; }
+.modal-content { border-radius: 12px; }
+.form-control { border-radius: 8px; }
+.form-check-input { cursor: pointer; }
+.badge { font-size: 13px; }
 </style>
 
 {% endblock %}

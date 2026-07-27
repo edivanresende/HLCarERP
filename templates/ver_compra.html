@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Compra #{{ compra.id }}{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-white">
+                <i class="fa fa-file-invoice"></i> Compra #{{ compra.id }}
+            </h2>
+            <small class="text-secondary">Detalhes da entrada de estoque</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/compras" class="btn btn-secondary">
+                <i class="fa fa-arrow-left"></i> Voltar
+            </a>
+            <a href="/compras/excluir/{{ compra.id }}" class="btn btn-danger"
+               onclick="return confirm('Excluir esta compra?')">
+                <i class="fa fa-trash"></i> Excluir
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card-dashboard shadow">
+                <small class="text-secondary">Data</small>
+                <h5 class="mt-2">
+                    {% if compra.data_entrada %}
+                        {{ compra.data_entrada.strftime('%d/%m/%Y') if compra.data_entrada.strftime else compra.data_entrada }}
+                    {% else %}-{% endif %}
+                </h5>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-dashboard shadow">
+                <small class="text-secondary">Nota / Doc</small>
+                <h5 class="mt-2">{{ compra.numero_nf or '-' }}</h5>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-dashboard shadow">
+                <small class="text-secondary">Fornecedor</small>
+                <h5 class="mt-2">
+                    {% if compra.fornecedor %}
+                        {{ compra.fornecedor.razao_social or compra.fornecedor.nome_fantasia or '-' }}
+                    {% else %}-{% endif %}
+                </h5>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-dashboard shadow">
+                <small class="text-secondary">Valor Total</small>
+                <h5 class="mt-2 text-warning">R$ {{ "%.2f"|format(compra.valor_total or 0) }}</h5>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow border-0">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Itens</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Qtd</th>
+                        <th>Custo unit.</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for it in itens %}
+                    <tr>
+                        <td>
+                            {% if it.produto %}
+                                {{ it.produto.descricao or it.produto.codigo or ('Produto #' ~ it.produto_id) }}
+                            {% else %}
+                                Produto #{{ it.produto_id }}
+                            {% endif %}
+                        </td>
+                        <td>{{ it.quantidade or 0 }}</td>
+                        <td>R$ {{ "%.2f"|format(it.valor_unitario or 0) }}</td>
+                        <td>R$ {{ "%.2f"|format(it.valor_total or 0) }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-secondary py-4">Sem itens</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if compra.observacoes %}
+    <div class="card shadow border-0 mt-3">
+        <div class="card-body">
+            <small class="text-secondary">Observações</small>
+            <p class="mb-0 text-white">{{ compra.observacoes }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

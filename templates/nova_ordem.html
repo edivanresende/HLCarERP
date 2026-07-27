@@ -1,188 +1,303 @@
 {% extends "base.html" %}
 
-{% block title %}
-Nova Ordem de Serviço
-{% endblock %}
+{% block title %}Nova Ordem de Serviço{% endblock %}
 
 {% block conteudo %}
-
 <div class="container-fluid">
 
-    <h2 class="mb-4">
-        Nova Ordem de Serviço
-    </h2>
+    <h2 class="mb-4 text-white">Nova Ordem de Serviço</h2>
 
     <div class="card-dashboard">
-
-        <form method="POST">
+        <form method="POST" id="form-os">
 
             <div class="row">
 
                 <div class="col-md-6 mb-3">
-
-                    <label>Cliente</label>
-
-                    <select
-                        name="cliente_id"
-                        class="form-control"
-                        required>
-
-                        <option value="">
-                            Selecione...
-                        </option>
-
+                    <label class="text-secondary">Cliente</label>
+                    <select name="cliente_id" id="cliente_id" class="form-control bg-dark text-white border-secondary" required>
+                        <option value="">Selecione...</option>
                         {% for cliente in clientes %}
-
-                        <option value="{{ cliente.id }}">
-                            {{ cliente.nome }}
-                        </option>
-
+                        <option value="{{ cliente.id }}">{{ cliente.nome }}</option>
                         {% endfor %}
-
                     </select>
-
                 </div>
 
                 <div class="col-md-6 mb-3">
-
-                    <label>Veículo</label>
-
-                    <select
-                        name="veiculo_id"
-                        class="form-control"
-                        required>
-
-                        <option value="">
-                            Selecione...
-                        </option>
-
+                    <label class="text-secondary">Veículo</label>
+                    <select name="veiculo_id" id="veiculo_id" class="form-control bg-dark text-white border-secondary" required>
+                        <option value="">Selecione...</option>
                         {% for veiculo in veiculos %}
-
-                        <option value="{{ veiculo.id }}">
+                        <option value="{{ veiculo.id }}" data-cliente="{{ veiculo.cliente_id }}">
                             {{ veiculo.placa }} - {{ veiculo.modelo }}
                         </option>
-
                         {% endfor %}
-
                     </select>
-
                 </div>
 
                 <div class="col-md-3 mb-3">
-
-                    <label>KM</label>
-
-                    <input
-                        type="number"
-                        name="km"
-                        class="form-control">
-
+                    <label class="text-secondary">KM</label>
+                    <input type="number" name="km" class="form-control bg-dark text-white border-secondary">
                 </div>
 
                 <div class="col-md-9 mb-3">
-
-                    <label>Mecânico</label>
-
-                    <input
-                        type="text"
-                        name="mecanico"
-                        class="form-control">
-
+                    <label class="text-secondary">Mecânico(s)</label>
+                    <div class="p-3 rounded" style="background:#0f172a;border:1px solid #333;">
+                        {% if mecanicos %}
+                            {% for m in mecanicos %}
+                            <div class="mb-3 pb-2" style="border-bottom:1px solid #222;">
+                                <div class="form-check">
+                                    <input class="form-check-input mec-check" type="checkbox"
+                                           name="mecanicos" value="{{ m.id }}" id="mec{{ m.id }}"
+                                           onchange="toggleMec({{ m.id }})">
+                                    <label class="form-check-label text-white" for="mec{{ m.id }}">
+                                        <strong>{{ m.nome }}</strong>
+                                    </label>
+                                </div>
+                                <div id="campos-mec-{{ m.id }}" class="row g-2 mt-2 ps-4" style="display:none;">
+                                    <div class="col-md-5">
+                                        <label class="text-secondary small">Serviço deste mecânico</label>
+                                        <input type="text" name="servico_{{ m.id }}"
+                                               class="form-control form-control-sm bg-dark text-white border-secondary"
+                                               placeholder="Ex: Alinhamento">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="text-secondary small">Tempo (min)</label>
+                                        <input type="number" name="duracao_{{ m.id }}" value="40" min="5" step="5"
+                                               class="form-control form-control-sm bg-dark text-white border-secondary">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="text-secondary small">Valor negociado (R$)</label>
+                                        <input type="number" step="0.01" name="valor_{{ m.id }}" value="0"
+                                               class="form-control form-control-sm bg-dark text-white border-secondary valor-servico"
+                                               oninput="recalcularTotais()">
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-secondary">Nenhum mecânico cadastrado.</span>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <div class="col-12 mb-3">
-
-                    <label>Defeito Relatado</label>
-
-                    <textarea
-                        name="defeito_relatado"
-                        rows="3"
-                        class="form-control"></textarea>
-
+                    <label class="text-secondary">Defeito Relatado</label>
+                    <textarea name="defeito_relatado" rows="2" class="form-control bg-dark text-white border-secondary"></textarea>
                 </div>
 
                 <div class="col-12 mb-3">
-
-                    <label>Diagnóstico</label>
-
-                    <textarea
-                        name="diagnostico"
-                        rows="3"
-                        class="form-control"></textarea>
-
+                    <label class="text-secondary">Diagnóstico</label>
+                    <textarea name="diagnostico" rows="2" class="form-control bg-dark text-white border-secondary"></textarea>
                 </div>
 
                 <div class="col-12 mb-3">
+                    <label class="text-secondary">Serviço Executado (geral)</label>
+                    <textarea name="servico_executado" rows="2" class="form-control bg-dark text-white border-secondary"></textarea>
+                </div>
 
-                    <label>Serviço Executado</label>
+                <!-- ===================== PEÇAS ===================== -->
+                <div class="col-12 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="text-secondary mb-0">Peças / Produtos</label>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="adicionarPeca('ESTOQUE')">
+                                + Estoque
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="adicionarPeca('PARCEIRO')">
+                                + Parceiro
+                            </button>
+                        </div>
+                    </div>
 
-                    <textarea
-                        name="servico_executado"
-                        rows="3"
-                        class="form-control"></textarea>
-
+                    <div class="table-responsive rounded" style="background:#0f172a;border:1px solid #333;">
+                        <table class="table table-dark table-sm align-middle mb-0" id="tabela-pecas">
+                            <thead>
+                                <tr>
+                                    <th style="width:110px">Origem</th>
+                                    <th>Descrição / Produto</th>
+                                    <th style="width:90px">Qtd</th>
+                                    <th style="width:120px">Valor unit.</th>
+                                    <th style="width:120px">Total</th>
+                                    <th style="width:50px"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpo-pecas">
+                                <!-- linhas via JS -->
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" class="text-end text-secondary">Total peças</td>
+                                    <td><strong id="total-pecas-label">R$ 0,00</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <input type="hidden" name="valor_pecas" id="valor_pecas" value="0">
                 </div>
 
                 <div class="col-md-4 mb-3">
-
-                    <label>Valor Serviços</label>
-
-                    <input
-                        type="number"
-                        step="0.01"
-                        value="0"
-                        name="valor_servicos"
-                        class="form-control">
-
+                    <label class="text-secondary">Desconto</label>
+                    <input type="number" step="0.01" value="0" name="desconto" id="desconto"
+                           class="form-control bg-dark text-white border-secondary"
+                           oninput="recalcularTotais()">
                 </div>
 
                 <div class="col-md-4 mb-3">
-
-                    <label>Valor Peças</label>
-
-                    <input
-                        type="number"
-                        step="0.01"
-                        value="0"
-                        name="valor_pecas"
-                        class="form-control">
-
+                    <label class="text-secondary">Agendar automaticamente?</label>
+                    <select name="agendar_auto" class="form-control bg-dark text-white border-secondary">
+                        <option value="sim" selected>Sim — colocar na agenda de cada mecânico</option>
+                        <option value="nao">Não — só gravar a OS</option>
+                    </select>
                 </div>
 
                 <div class="col-md-4 mb-3">
-
-                    <label>Desconto</label>
-
-                    <input
-                        type="number"
-                        step="0.01"
-                        value="0"
-                        name="desconto"
-                        class="form-control">
-
+                    <label class="text-secondary">Total da OS</label>
+                    <div class="form-control bg-dark text-success border-secondary fw-bold" id="total-os-label">
+                        R$ 0,00
+                    </div>
                 </div>
 
             </div>
 
-            <button
-                class="btn btn-success">
-
-                Salvar Ordem
-
-            </button>
-
-            <a
-                href="/ordens"
-                class="btn btn-secondary">
-
-                Cancelar
-
-            </a>
+            <button type="submit" class="btn btn-success">Salvar Ordem</button>
+            <a href="/ordens" class="btn btn-secondary">Cancelar</a>
 
         </form>
-
     </div>
-
 </div>
 
+<!-- Dados para o JS -->
+<script type="application/json" id="dados-produtos">
+[
+{% for p in produtos %}
+  {
+    "id": {{ p.id }},
+    "codigo": {{ (p.codigo or "")|tojson }},
+    "descricao": {{ (p.descricao or "")|tojson }},
+    "preco": {{ (p.preco_venda or 0)|float }},
+    "estoque": {{ (p.estoque_atual or 0)|float }}
+  }{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script type="application/json" id="dados-fornecedores">
+[
+{% for f in fornecedores %}
+  {
+    "id": {{ f.id }},
+    "nome": {{ (f.nome or f.nome_fantasia or "")|tojson }}
+  }{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script>
+let contadorPeca = 0;
+const produtos = JSON.parse(document.getElementById('dados-produtos').textContent || '[]');
+const fornecedores = JSON.parse(document.getElementById('dados-fornecedores').textContent || '[]');
+
+function toggleMec(id) {
+    const box = document.getElementById('campos-mec-' + id);
+    const chk = document.getElementById('mec' + id);
+    box.style.display = chk.checked ? 'flex' : 'none';
+    recalcularTotais();
+}
+
+function formatMoney(v) {
+    return 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ',');
+}
+
+function adicionarPeca(origem) {
+    contadorPeca += 1;
+    const id = contadorPeca;
+    const tbody = document.getElementById('corpo-pecas');
+    const tr = document.createElement('tr');
+    tr.id = 'peca-row-' + id;
+
+    let descHtml = '';
+    if (origem === 'ESTOQUE') {
+        let opts = '<option value="">Selecione o produto...</option>';
+        produtos.forEach(function (p) {
+            opts += '<option value="' + p.id + '" data-preco="' + p.preco + '">' +
+                (p.codigo ? p.codigo + ' - ' : '') + p.descricao +
+                ' (est: ' + p.estoque + ')</option>';
+        });
+        descHtml =
+            '<input type="hidden" name="item_tipo" value="ESTOQUE">' +
+            '<input type="hidden" name="item_descricao" id="item_desc_' + id + '" value="">' +
+            '<select name="item_produto_id" class="form-select form-select-sm bg-dark text-white border-secondary" ' +
+            'onchange="produtoSelecionado(' + id + ', this)">' + opts + '</select>';
+    } else {
+        descHtml =
+            '<input type="hidden" name="item_tipo" value="PARCEIRO">' +
+            '<input type="hidden" name="item_produto_id" value="">' +
+            '<input type="text" name="item_descricao" class="form-control form-control-sm bg-dark text-white border-secondary" ' +
+            'placeholder="Descrição da peça do parceiro" required>';
+    }
+
+    tr.innerHTML =
+        '<td><span class="badge ' + (origem === 'ESTOQUE' ? 'bg-info' : 'bg-warning text-dark') + '">' + origem + '</span></td>' +
+        '<td>' + descHtml + '</td>' +
+        '<td><input type="number" name="item_qtd" value="1" min="0.01" step="0.01" ' +
+        'class="form-control form-control-sm bg-dark text-white border-secondary" oninput="recalcularLinha(' + id + ')"></td>' +
+        '<td><input type="number" name="item_valor_unit" id="item_vu_' + id + '" value="0" min="0" step="0.01" ' +
+        'class="form-control form-control-sm bg-dark text-white border-secondary" oninput="recalcularLinha(' + id + ')"></td>' +
+        '<td><span id="item_total_' + id + '">R$ 0,00</span></td>' +
+        '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerPeca(' + id + ')">' +
+        '<i class="fa fa-times"></i></button></td>';
+
+    tbody.appendChild(tr);
+    recalcularTotais();
+}
+
+function produtoSelecionado(id, sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const preco = parseFloat(opt.getAttribute('data-preco') || 0);
+    document.getElementById('item_vu_' + id).value = preco.toFixed(2);
+    const desc = opt.textContent || '';
+    const hiddenDesc = document.getElementById('item_desc_' + id);
+    if (hiddenDesc) hiddenDesc.value = desc;
+    recalcularLinha(id);
+}
+
+function recalcularLinha(id) {
+    const row = document.getElementById('peca-row-' + id);
+    if (!row) return;
+    const qtd = parseFloat(row.querySelector('[name="item_qtd"]').value || 0);
+    const vu = parseFloat(row.querySelector('[name="item_valor_unit"]').value || 0);
+    document.getElementById('item_total_' + id).textContent = formatMoney(qtd * vu);
+    recalcularTotais();
+}
+
+function removerPeca(id) {
+    const row = document.getElementById('peca-row-' + id);
+    if (row) row.remove();
+    recalcularTotais();
+}
+
+function recalcularTotais() {
+    let totalPecas = 0;
+    document.querySelectorAll('#corpo-pecas tr').forEach(function (row) {
+        const qtd = parseFloat(row.querySelector('[name="item_qtd"]').value || 0);
+        const vu = parseFloat(row.querySelector('[name="item_valor_unit"]').value || 0);
+        totalPecas += qtd * vu;
+    });
+
+    let totalServicos = 0;
+    document.querySelectorAll('.mec-check:checked').forEach(function (chk) {
+        const id = chk.value;
+        const input = document.querySelector('[name="valor_' + id + '"]');
+        if (input) totalServicos += parseFloat(input.value || 0);
+    });
+
+    const desconto = parseFloat(document.getElementById('desconto').value || 0);
+    const total = totalServicos + totalPecas - desconto;
+
+    document.getElementById('valor_pecas').value = totalPecas.toFixed(2);
+    document.getElementById('total-pecas-label').textContent = formatMoney(totalPecas);
+    document.getElementById('total-os-label').textContent = formatMoney(total);
+}
+</script>
 {% endblock %}

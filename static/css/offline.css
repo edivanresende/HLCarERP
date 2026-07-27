@@ -1,0 +1,23 @@
+#hl-offline-badge {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+}
+#hl-offline-badge.online { background: #059669; }
+#hl-offline-badge.offline { background: #dc2626; animation: pulse-offline 2s infinite; }
+#hl-offline-badge.syncing { background: #d97706; }
+@keyframes pulse-offline {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Financeiro{% endblock %}
+{% block conteudo %}
+<div class="container-fluid">
+    <h2 class="text-white mb-4"><i class="fa fa-dollar-sign"></i> Financeiro</h2>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card-dashboard">
+                <div>Total de OS</div>
+                <div class="numero">{{ total_ordens }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-dashboard">
+                <div>Faturamento</div>
+                <div class="numero">R$ {{ "%.2f"|format(faturamento) }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-dashboard">
+                <div>OS Abertas</div>
+                <div class="numero">{{ abertas }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-dashboard">
+                <div>OS Finalizadas</div>
+                <div class="numero">{{ finalizadas }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -9,430 +9,499 @@ Dashboard
 <div class="container-fluid">
 
     <div class="row mb-4">
-
         <div class="col">
-
-            <h2 class="text-white">
-                Dashboard
-            </h2>
-
+            <h2 class="text-white">Dashboard</h2>
             <p class="text-secondary">
                 Bem-vindo ao <strong>HLCarERP</strong> - Sistema de Gestão da Oficina
             </p>
-
         </div>
-
     </div>
 
+    <!-- CARDS PRINCIPAIS -->
     <div class="row g-4">
 
         <div class="col-xl-3 col-md-6">
-
             <div class="card-dashboard shadow">
-
                 <div class="d-flex justify-content-between align-items-center">
-
                     <div>
-
-                        <small class="text-secondary">
-                            Clientes
-                        </small>
-
-                        <h2 class="mt-2 fw-bold">
-
-                            {{ total_clientes }}
-
-                        </h2>
-
+                        <small class="text-secondary">Clientes</small>
+                        <h2 class="mt-2 fw-bold">{{ total_clientes }}</h2>
                     </div>
-
                     <div style="font-size:45px;color:#4f8cff">
-
                         <i class="fa fa-users"></i>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
         <div class="col-xl-3 col-md-6">
-
             <div class="card-dashboard shadow">
-
                 <div class="d-flex justify-content-between align-items-center">
-
                     <div>
-
-                        <small class="text-secondary">
-                            Veículos
-                        </small>
-
-                        <h2 class="mt-2 fw-bold">
-
-                            {{ total_veiculos }}
-
-                        </h2>
-
+                        <small class="text-secondary">Veículos</small>
+                        <h2 class="mt-2 fw-bold">{{ total_veiculos }}</h2>
                     </div>
-
                     <div style="font-size:45px;color:#16a34a">
-
                         <i class="fa fa-car"></i>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
         <div class="col-xl-3 col-md-6">
-
             <div class="card-dashboard shadow">
-
                 <div class="d-flex justify-content-between align-items-center">
-
                     <div>
-
-                        <small class="text-secondary">
-                            Ordens de Serviço
-                        </small>
-
-                        <h2 class="mt-2 fw-bold">
-
-                            {{ total_os }}
-
-                        </h2>
-
+                        <small class="text-secondary">Ordens de Serviço</small>
+                        <h2 class="mt-2 fw-bold">{{ total_os }}</h2>
                     </div>
-
                     <div style="font-size:45px;color:#f59e0b">
-
                         <i class="fa fa-file-alt"></i>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
         <div class="col-xl-3 col-md-6">
-
             <div class="card-dashboard shadow">
-
                 <div class="d-flex justify-content-between align-items-center">
-
                     <div>
-
-                        <small class="text-secondary">
-                            Faturamento
-                        </small>
-
+                        <small class="text-secondary">Faturamento</small>
                         <h3 class="mt-2 fw-bold">
-
                             R$ {{ "{:,.2f}".format(faturamento).replace(",", "X").replace(".", ",").replace("X",".") }}
-
                         </h3>
-
                     </div>
-
                     <div style="font-size:45px;color:#22c55e">
-
                         <i class="fa fa-dollar-sign"></i>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
 
     </div>
 
+    <!-- GRÁFICO + AGENDA -->
     <div class="row mt-5">
 
         <div class="col-lg-8">
-
             <div class="card-dashboard shadow">
-
                 <h4 class="mb-4">
-
                     <i class="fa fa-chart-line"></i>
-
                     Movimento da Oficina
-
                 </h4>
-                                <div style="height:350px;display:flex;align-items:center;justify-content:center;flex-direction:column">
-
-                    <i class="fa fa-chart-area mb-3"
-                       style="font-size:70px;color:#3b82f6;">
-                    </i>
-
-                    <h5 class="text-secondary">
-
-                        Em breve este gráfico exibirá:
-
-                    </h5>
-
+                <div style="height:350px;display:flex;align-items:center;justify-content:center;flex-direction:column">
+                    <i class="fa fa-chart-area mb-3" style="font-size:70px;color:#3b82f6;"></i>
+                    <h5 class="text-secondary">Em breve este gráfico exibirá:</h5>
                     <ul class="text-secondary mt-3" style="line-height:35px;font-size:18px">
-
                         <li>Faturamento diário</li>
-
                         <li>Ordens de serviço por mês</li>
-
                         <li>Serviços mais vendidos</li>
-
                         <li>Comparativo mensal</li>
-
                         <li>Meta x Realizado</li>
-
                     </ul>
-
                 </div>
-
             </div>
-
         </div>
 
+        <!-- AGENDA DO BANCO -->
         <div class="col-lg-4">
-
             <div class="card-dashboard shadow">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0">
+                        <i class="fa fa-calendar-check"></i>
+                        Agenda do Dia
+                    </h4>
+                    <button class="btn btn-sm btn-warning" onclick="abrirFormAgendamento()" title="Novo agendamento">
+                        <i class="fa fa-plus"></i>
+                    </button>
+                </div>
 
-                <h4 class="mb-4">
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Mecânico</label>
+                    <select id="select-mecanico" class="form-select bg-dark text-white border-secondary" onchange="trocarMecanico()">
+                        <option value="">Selecione o mecânico</option>
+                        {% for m in mecanicos %}
+                        <option value="{{ m.id }}"
+                            data-entrada="{{ m.hora_entrada or 9 }}"
+                            data-saida="{{ m.hora_saida or 18 }}"
+                            data-almoco-inicio="{{ m.almoco_inicio or 12 }}"
+                            data-almoco-fim="{{ m.almoco_fim or 14 }}"
+                            data-nome="{{ m.nome }}">
+                            {{ m.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-                    <i class="fa fa-calendar-check"></i>
+                <div class="mb-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="dia-fechado" onchange="montarAgenda()">
+                        <label class="form-check-label text-secondary small" for="dia-fechado">
+                            Fechar o dia inteiro (serviço longo)
+                        </label>
+                    </div>
+                </div>
 
-                    Agenda do Dia
+                <!-- Formulário manual -->
+                <div id="form-agendamento" class="mb-3 p-2 rounded" style="background:#0f172a;display:none;">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label text-secondary small mb-1">Início</label>
+                            <input type="time" id="ag-inicio" class="form-control form-control-sm bg-dark text-white border-secondary" value="09:00">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-secondary small mb-1">Duração (min)</label>
+                            <input type="number" id="ag-duracao" class="form-control form-control-sm bg-dark text-white border-secondary" value="40" min="5" step="5">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-secondary small mb-1">Serviço / placa / cliente</label>
+                            <input type="text" id="ag-descricao" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Ex: Alinhamento - ABC1D23">
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-warning" onclick="salvarAgendamentoManual()">Salvar</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fecharFormAgendamento()">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
 
-                </h4>
+                <div id="horarios-livres" class="mb-3 small"></div>
 
-                <table class="table table-dark table-hover align-middle">
-
-                    <thead>
-
-                        <tr>
-
-                            <th width="30%">Hora</th>
-
-                            <th>Serviço</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        <tr>
-                            <td>08:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                        <tr>
-                            <td>09:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                        <tr>
-                            <td>10:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                        <tr>
-                            <td>11:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                        <tr>
-                            <td>13:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                        <tr>
-                            <td>14:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                        <tr>
-                            <td>15:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                        <tr>
-                            <td>16:00</td>
-                            <td>Disponível</td>
-                        </tr>
-
-                    </tbody>
-
-                </table>
-
+                <div id="agenda-lista" style="max-height:280px;overflow-y:auto;">
+                    <p class="text-secondary text-center py-3 mb-0">Selecione um mecânico</p>
+                </div>
             </div>
-
         </div>
 
     </div>
 
+    <!-- CARDS INFERIORES -->
     <div class="row mt-4">
-
         <div class="col-lg-4">
-
             <div class="card-dashboard shadow">
-
-                <h5>
-
-                    <i class="fa fa-tools"></i>
-
-                    Oficina
-
-                </h5>
-
+                <h5><i class="fa fa-tools"></i> Oficina</h5>
                 <hr>
-
-                <p class="mb-2">
-                    🔧 Ordens em andamento
-                </p>
-
-                <h3>
-                    0
-                </h3>
-
+                <p class="mb-2">🔧 Ordens em andamento</p>
+                <h3>0</h3>
             </div>
-
         </div>
-
         <div class="col-lg-4">
-
             <div class="card-dashboard shadow">
-
-                <h5>
-
-                    <i class="fa fa-boxes"></i>
-
-                    Estoque
-                </h5>
-
+                <h5><i class="fa fa-boxes"></i> Estoque</h5>
                 <hr>
-
-                <p class="mb-2">
-
-                    📦 Produtos com estoque baixo
-
-                </p>
-
-                <h3>
-
-                    0
-
-                </h3>
-
+                <p class="mb-2">📦 Produtos com estoque baixo</p>
+                <h3>0</h3>
             </div>
-
         </div>
-                <div class="col-lg-4">
-
+        <div class="col-lg-4">
             <div class="card-dashboard shadow">
-
-                <h5>
-
-                    <i class="fa fa-money-bill-wave"></i>
-
-                    Financeiro
-
-                </h5>
-
+                <h5><i class="fa fa-money-bill-wave"></i> Financeiro</h5>
                 <hr>
-
-                <p class="mb-2">
-
-                    💰 Contas a Receber
-
-                </p>
-
-                <h3>
-
-                    R$ 0,00
-
-                </h3>
-
+                <p class="mb-2">💰 Contas a Receber</p>
+                <h3>R$ 0,00</h3>
             </div>
-
         </div>
-
     </div>
 
     <div class="row mt-4">
-
         <div class="col-lg-6">
-
             <div class="card-dashboard shadow">
-
-                <h5>
-
-                    <i class="fa fa-clock"></i>
-
-                    Últimas Ordens de Serviço
-
-                </h5>
-
+                <h5><i class="fa fa-clock"></i> Últimas Ordens de Serviço</h5>
                 <hr>
-
                 <div class="text-secondary text-center py-5">
-
-                    <i class="fa fa-file-alt mb-3"
-                       style="font-size:50px;"></i>
-
-                    <p>
-
-                        Nenhuma Ordem de Serviço cadastrada.
-
-                    </p>
-
+                    <i class="fa fa-file-alt mb-3" style="font-size:50px;"></i>
+                    <p>Nenhuma Ordem de Serviço cadastrada.</p>
                 </div>
-
             </div>
-
         </div>
-
         <div class="col-lg-6">
-
             <div class="card-dashboard shadow">
-
-                <h5>
-
-                    <i class="fa fa-car-side"></i>
-
-                    Veículos em Atendimento
-
-                </h5>
-
+                <h5><i class="fa fa-car-side"></i> Veículos em Atendimento</h5>
                 <hr>
-
                 <div class="text-secondary text-center py-5">
-
-                    <i class="fa fa-car mb-3"
-                       style="font-size:50px;"></i>
-
-                    <p>
-
-                        Nenhum veículo em atendimento.
-
-                    </p>
-
+                    <i class="fa fa-car mb-3" style="font-size:50px;"></i>
+                    <p>Nenhum veículo em atendimento.</p>
                 </div>
-
             </div>
-
         </div>
-
     </div>
 
 </div>
+
+<script>
+let agendaAtual = [];
+
+function minutosParaHora(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+
+function horaParaMinutos(horaStr) {
+    const p = (horaStr || '00:00').split(':');
+    return parseInt(p[0]) * 60 + parseInt(p[1] || 0);
+}
+
+function getConfigMecanico() {
+    const sel = document.getElementById('select-mecanico');
+    if (!sel.value) return null;
+    const opt = sel.options[sel.selectedIndex];
+    return {
+        entrada: parseInt(opt.getAttribute('data-entrada') || 9) * 60,
+        saida: parseInt(opt.getAttribute('data-saida') || 18) * 60,
+        almocoInicio: parseInt(opt.getAttribute('data-almoco-inicio') || 12) * 60,
+        almocoFim: parseInt(opt.getAttribute('data-almoco-fim') || 14) * 60
+    };
+}
+
+function trocarMecanico() {
+    document.getElementById('dia-fechado').checked = false;
+    fecharFormAgendamento();
+    montarAgenda();
+}
+
+function abrirFormAgendamento() {
+    const sel = document.getElementById('select-mecanico');
+    if (!sel.value) {
+        alert('Selecione um mecânico primeiro.');
+        return;
+    }
+    document.getElementById('form-agendamento').style.display = 'block';
+    document.getElementById('ag-inicio').value = calcularProximoInicio();
+    document.getElementById('ag-duracao').value = 40;
+    document.getElementById('ag-descricao').value = '';
+}
+
+function fecharFormAgendamento() {
+    document.getElementById('form-agendamento').style.display = 'none';
+}
+
+function calcularProximoInicio() {
+    const cfg = getConfigMecanico();
+    if (!cfg) return '09:00';
+    let proximo = cfg.entrada;
+    agendaAtual.forEach(function (a) {
+        const fim = horaParaMinutos(a.hora_inicio) + parseInt(a.duracao_min || 40);
+        if (fim > proximo) proximo = fim;
+    });
+    if (proximo >= cfg.almocoInicio && proximo < cfg.almocoFim) proximo = cfg.almocoFim;
+    if (proximo >= cfg.saida) proximo = cfg.entrada;
+    return minutosParaHora(proximo);
+}
+
+function calcularHorariosLivres() {
+    const cfg = getConfigMecanico();
+    if (!cfg) return [];
+    const lista = agendaAtual.slice().sort(function (a, b) {
+        return horaParaMinutos(a.hora_inicio) - horaParaMinutos(b.hora_inicio);
+    });
+    const livres = [];
+    let cursor = cfg.entrada;
+
+    function pulaAlmoco(pos) {
+        if (pos >= cfg.almocoInicio && pos < cfg.almocoFim) return cfg.almocoFim;
+        return pos;
+    }
+    cursor = pulaAlmoco(cursor);
+
+    lista.forEach(function (a) {
+        const ini = horaParaMinutos(a.hora_inicio);
+        const fim = ini + parseInt(a.duracao_min || 40);
+        if (ini > cursor) {
+            if (cursor < cfg.almocoInicio && ini > cfg.almocoInicio) {
+                if (cfg.almocoInicio - cursor >= 10)
+                    livres.push({ inicio: minutosParaHora(cursor), fim: minutosParaHora(cfg.almocoInicio) });
+                cursor = cfg.almocoFim;
+                if (ini > cursor && ini - cursor >= 10)
+                    livres.push({ inicio: minutosParaHora(cursor), fim: minutosParaHora(ini) });
+            } else if (ini - cursor >= 10) {
+                livres.push({ inicio: minutosParaHora(cursor), fim: minutosParaHora(ini) });
+            }
+        }
+        cursor = Math.max(cursor, fim);
+        cursor = pulaAlmoco(cursor);
+    });
+
+    if (cursor < cfg.saida) {
+        if (cursor < cfg.almocoInicio) {
+            if (cfg.almocoInicio - cursor >= 10)
+                livres.push({ inicio: minutosParaHora(cursor), fim: minutosParaHora(cfg.almocoInicio) });
+            if (cfg.saida - cfg.almocoFim >= 10)
+                livres.push({ inicio: minutosParaHora(cfg.almocoFim), fim: minutosParaHora(cfg.saida) });
+        } else if (cfg.saida - cursor >= 10) {
+            livres.push({ inicio: minutosParaHora(cursor), fim: minutosParaHora(cfg.saida) });
+        }
+    }
+    return livres;
+}
+
+function montarAgenda() {
+    const sel = document.getElementById('select-mecanico');
+    const box = document.getElementById('agenda-lista');
+    const livresBox = document.getElementById('horarios-livres');
+
+    if (!sel.value) {
+        box.innerHTML = '<p class="text-secondary text-center py-3 mb-0">Selecione um mecânico</p>';
+        livresBox.innerHTML = '';
+        agendaAtual = [];
+        return;
+    }
+
+    if (document.getElementById('dia-fechado').checked) {
+        box.innerHTML = '<p class="text-warning text-center py-4 mb-0"><i class="fa fa-lock"></i> Dia fechado para serviço longo</p>';
+        livresBox.innerHTML = '';
+        return;
+    }
+
+    box.innerHTML = '<p class="text-secondary text-center py-3">Carregando...</p>';
+
+    fetch('/api/agenda?mecanico_id=' + sel.value)
+        .then(function (r) { return r.json(); })
+        .then(function (lista) {
+            agendaAtual = lista || [];
+            renderAgenda();
+        })
+        .catch(function () {
+            agendaAtual = [];
+            box.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar agenda. Confira se as rotas /api/agenda estão no app.py</p>';
+        });
+}
+
+function renderAgenda() {
+    const cfg = getConfigMecanico();
+    const box = document.getElementById('agenda-lista');
+    const livresBox = document.getElementById('horarios-livres');
+
+    const livres = calcularHorariosLivres();
+    if (livres.length > 0) {
+        let txt = '<div class="text-success mb-1"><i class="fa fa-clock"></i> <strong>Horários livres:</strong></div>';
+        txt += '<div class="d-flex flex-wrap gap-1 mb-2">';
+        livres.forEach(function (l) {
+            txt += '<span class="badge bg-success" style="cursor:pointer" onclick="usarHorarioLivre(\'' + l.inicio + '\')">' +
+                l.inicio + ' – ' + l.fim + '</span>';
+        });
+        txt += '</div>';
+        livresBox.innerHTML = txt;
+    } else {
+        livresBox.innerHTML = '<div class="text-warning small mb-2"><i class="fa fa-exclamation-circle"></i> Sem horários livres</div>';
+    }
+
+    let html = '<div class="small text-secondary mb-2">Expediente: ' +
+        minutosParaHora(cfg.entrada) + ' – ' + minutosParaHora(cfg.saida) +
+        ' | Almoço: ' + minutosParaHora(cfg.almocoInicio) + ' – ' + minutosParaHora(cfg.almocoFim) + '</div>';
+
+    if (agendaAtual.length === 0) {
+        html += '<p class="text-success text-center py-3 mb-0">Nenhum agendamento — dia livre</p>';
+        box.innerHTML = html;
+        return;
+    }
+
+    html += '<table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>Horário</th><th>Serviço</th><th></th></tr></thead><tbody>';
+
+    agendaAtual.forEach(function (a) {
+        const dur = a.duracao_min || 40;
+        const fim = a.hora_fim || minutosParaHora(horaParaMinutos(a.hora_inicio) + dur);
+        html += '<tr>' +
+            '<td style="white-space:nowrap">' + a.hora_inicio + ' – ' + fim +
+            '<br><small class="text-secondary">' + dur + ' min</small></td>' +
+            '<td class="text-warning">' + (a.descricao || '') +
+            (a.ordem_servico_id ? ' <small class="text-secondary">(OS)</small>' : '') + '</td>' +
+            '<td class="text-nowrap">' +
+            '<button class="btn btn-sm btn-outline-warning me-1" onclick="alterarDuracao(' + a.id + ',' + dur + ')" title="Alterar duração"><i class="fa fa-clock"></i></button>' +
+            '<button class="btn btn-sm btn-outline-danger" onclick="excluirAgendamento(' + a.id + ')" title="Remover"><i class="fa fa-times"></i></button>' +
+            '</td></tr>';
+    });
+
+    html += '</tbody></table>';
+    box.innerHTML = html;
+}
+
+function usarHorarioLivre(inicio) {
+    abrirFormAgendamento();
+    document.getElementById('ag-inicio').value = inicio;
+}
+
+function alterarDuracao(id, atual) {
+    const novo = prompt('Nova duração em minutos:', atual);
+    if (!novo) return;
+    const dur = parseInt(novo);
+    if (isNaN(dur) || dur < 5) {
+        alert('Duração inválida (mínimo 5 min).');
+        return;
+    }
+    fetch('/api/agenda/atualizar/' + id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duracao_min: dur })
+    }).then(function () { montarAgenda(); });
+}
+
+function excluirAgendamento(id) {
+    if (!confirm('Remover este agendamento?')) return;
+    fetch('/api/agenda/excluir/' + id, { method: 'POST' })
+        .then(function () { montarAgenda(); });
+}
+
+function salvarAgendamentoManual() {
+    const sel = document.getElementById('select-mecanico');
+    if (!sel.value) return;
+
+    const inicio = document.getElementById('ag-inicio').value;
+    const duracao = parseInt(document.getElementById('ag-duracao').value || 0);
+    const descricao = (document.getElementById('ag-descricao').value || '').trim();
+
+    if (!inicio || duracao < 5) {
+        alert('Informe horário e duração (mín. 5 min).');
+        return;
+    }
+    if (!descricao) {
+        alert('Informe o serviço / placa / cliente.');
+        return;
+    }
+
+    // conflito simples no cliente
+    const iniMin = horaParaMinutos(inicio);
+    const fimMin = iniMin + duracao;
+    for (let i = 0; i < agendaAtual.length; i++) {
+        const a = agendaAtual[i];
+        const aIni = horaParaMinutos(a.hora_inicio);
+        const aFim = aIni + parseInt(a.duracao_min || 40);
+        if (iniMin < aFim && fimMin > aIni) {
+            alert('Horário indisponível! Conflito com: ' + a.hora_inicio + ' – ' + (a.descricao || ''));
+            return;
+        }
+    }
+
+    fetch('/api/agenda/criar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            mecanico_id: parseInt(sel.value),
+            hora_inicio: inicio,
+            duracao_min: duracao,
+            descricao: descricao
+        })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (res.erro) {
+            alert(res.erro);
+            return;
+        }
+        fecharFormAgendamento();
+        montarAgenda();
+    })
+    .catch(function () {
+        alert('Erro ao salvar. Confira a rota /api/agenda/criar no app.py');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const sel = document.getElementById('select-mecanico');
+    if (sel && sel.options.length > 1) {
+        sel.selectedIndex = 1;
+        montarAgenda();
+    }
+});
+</script>
 
 {% endblock %}
