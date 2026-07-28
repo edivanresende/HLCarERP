@@ -1,15 +1,75 @@
 {% extends "base.html" %}
+
 {% block title %}Usuários{% endblock %}
+
 {% block conteudo %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-white mb-0"><i class="fa fa-user-cog"></i> Usuários</h2>
-        <button class="btn btn-warning" disabled>+ Novo Usuário (em breve)</button>
+        <h2 class="text-white"><i class="fa fa-users"></i> Usuários</h2>
+        <a href="/usuarios/novo" class="btn btn-warning">
+            <i class="fa fa-plus"></i> Novo Usuário
+        </a>
     </div>
-    <div class="card-dashboard">
-        <p class="text-secondary mb-0">
-            Módulo de usuários e permissões será implementado em seguida (login + olhinho de senha).
-        </p>
+
+    <div class="card bg-dark shadow border-0">
+        <div class="card-body">
+            <table class="table table-dark table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Login</th>
+                        <th>E-mail</th>
+                        <th>Perfil</th>
+                        <th>Status</th>
+                        <th width="280">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr>
+                        <td>{{ u.nome }}</td>
+                        <td>{{ u.login }}</td>
+                        <td>{{ u.email or '-' }}</td>
+                        <td>
+                            {% if u.perfil == 'ADMIN' %}
+                                <span class="badge bg-danger">ADMIN</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ u.perfil }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.ativo %}
+                                <span class="badge bg-success">Ativo</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/usuarios/editar/{{ u.id }}" class="btn btn-primary btn-sm">Editar</a>
+                            <a href="/usuarios/resetar-senha/{{ u.id }}"
+                               class="btn btn-warning btn-sm"
+                               onclick="return confirm('Resetar senha para 123456?')">
+                                Resetar Senha
+                            </a>
+                            {% if u.id != session.usuario_id %}
+                            <a href="/usuarios/excluir/{{ u.id }}"
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('Excluir este usuário?')">
+                                Excluir
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-4">
+                            Nenhum usuário cadastrado
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}

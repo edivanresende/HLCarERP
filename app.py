@@ -4,12 +4,15 @@ from flask import (
     request,
     redirect,
     send_file,
-    jsonify
+    jsonify,
+    session
 )
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
-from sqlalchemy import text
+from sqlalchemy import text, func
 
 from config import Config
 
@@ -30,6 +33,9 @@ from models import (
     Mecanico,
     OrdemServicoMecanico,
     Agendamento,
+    Usuario,
+    Empresa,
+    ItemOrdemServico,
 )
 
 from pdf_ordem_old import gerar_pdf_ordem
@@ -37,51 +43,358 @@ from pdf_ordem_old import gerar_pdf_ordem
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.secret_key = "hlcar-erp-secret-key-2026-change-me"
+
 db.init_app(app)
+
+
+# ============================================================
+# AUTENTICAÇÃO
+# ============================================================
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "usuario_id" not in session:
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def criar_admin_se_nao_existir():
+    """Cria a empresa e o usuário admin na primeira execução"""
+    try:
+        empresa = Empresa.query.first()
+        if not empresa:
+            empresa = Empresa(
+                razao_social="HL Car Auto Center",
+                nome_fantasia="HL Car Auto Center",
+                cnpj="00.000.000/0001-00",
+                ativo=True
+            )
+            db.session.add(empresa)
+            db.session.commit()
+            print("✅ Empresa criada")
+
+        admin = Usuario.query.filter_by(login="admin").first()
+        if not admin:
+            admin = Usuario(
+                empresa_id=empresa.id,
+                nome="Administrador",
+                login="admin",
+                senha=generate_password_hash("admin123"),
+                perfil="ADMIN",
+                ativo=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("✅ Usuário admin criado!")
+            print("   Login: admin")
+            print("   Senha: admin123")
+    except Exception as e:
+        print("Erro ao criar admin:", e)
+        db.session.rollback()
+
+
+def corrigir_colunas_banco():
+    """Adiciona colunas que faltam (sem apagar dados)"""
+    try:
+        # ========== USUARIOS ==========
+        result = db.session.execute(text("PRAGMA table_info(usuarios)")).fetchall()
+        colunas = [row[1] for row in result]
+
+        if "email" not in colunas:
+            db.session.execute(text("ALTER TABLE usuarios ADD COLUMN email VARCHAR(150)"))
+            print("✅ usuarios.email adicionada")
+
+        if "alterado_em" not in colunas:
+            db.session.execute(text("ALTER TABLE usuarios ADD COLUMN alterado_em DATETIME"))
+            print("✅ usuarios.alterado_em adicionada")
+
+        if "criado_em" not in colunas:
+            db.session.execute(text("ALTER TABLE usuarios ADD COLUMN criado_em DATETIME"))
+            print("✅ usuarios.criado_em adicionada")
+
+        if "perfil" not in colunas:
+            db.session.execute(text("ALTER TABLE usuarios ADD COLUMN perfil VARCHAR(20) DEFAULT 'CONSULTOR'"))
+            print("✅ usuarios.perfil adicionada")
+
+        # ========== EMPRESAS ==========
+        result = db.session.execute(text("PRAGMA table_info(empresas)")).fetchall()
+        colunas = [row[1] for row in result]
+
+        colunas_empresas = {
+            "inscricao_estadual": "VARCHAR(30)",
+            "telefone": "VARCHAR(30)",
+            "whatsapp": "VARCHAR(30)",
+            "email": "VARCHAR(150)",
+            "site": "VARCHAR(200)",
+            "cep": "VARCHAR(15)",
+            "endereco": "VARCHAR(200)",
+            "numero": "VARCHAR(20)",
+            "complemento": "VARCHAR(100)",
+            "bairro": "VARCHAR(100)",
+            "cidade": "VARCHAR(100)",
+            "estado": "VARCHAR(2)",
+            "logo": "VARCHAR(255)",
+            "criado_em": "DATETIME",
+            "alterado_em": "DATETIME",
+        }
+
+        for coluna, tipo in colunas_empresas.items():
+            if coluna not in colunas:
+                db.session.execute(text(f"ALTER TABLE empresas ADD COLUMN {coluna} {tipo}"))
+                print(f"✅ empresas.{coluna} adicionada")
+
+        # ========== CLIENTES ==========
+        result = db.session.execute(text("PRAGMA table_info(clientes)")).fetchall()
+        colunas = [row[1] for row in result]
+
+        if "data_nascimento" not in colunas:
+            db.session.execute(text("ALTER TABLE clientes ADD COLUMN data_nascimento DATE"))
+            print("✅ clientes.data_nascimento adicionada")
+
+        # ========== VEICULOS ==========
+        result = db.session.execute(text("PRAGMA table_info(veiculos)")).fetchall()
+        colunas = [row[1] for row in result]
+
+        if "proxima_revisao_data" not in colunas:
+            db.session.execute(text("ALTER TABLE veiculos ADD COLUMN proxima_revisao_data DATE"))
+            print("✅ veiculos.proxima_revisao_data adicionada")
+
+        if "proxima_revisao_km" not in colunas:
+            db.session.execute(text("ALTER TABLE veiculos ADD COLUMN proxima_revisao_km INTEGER"))
+            print("✅ veiculos.proxima_revisao_km adicionada")
+
+        if "km" not in colunas:
+            db.session.execute(text("ALTER TABLE veiculos ADD COLUMN km INTEGER"))
+            print("✅ veiculos.km adicionada")
+        # ========== ORDEM_SERVICO_MECANICOS ==========
+        result = db.session.execute(text("PRAGMA table_info(ordem_servico_mecanicos)")).fetchall()
+        colunas = [row[1] for row in result]
+        if "descricao_servico" not in colunas:
+            db.session.execute(text("ALTER TABLE ordem_servico_mecanicos ADD COLUMN descricao_servico VARCHAR(250)"))
+            print("✅ ordem_servico_mecanicos.descricao_servico adicionada")
+                    # ========== ITENS_ORDEM_SERVICO ==========
+        try:
+            result = db.session.execute(text("PRAGMA table_info(itens_ordem_servico)")).fetchall()
+            colunas = [row[1] for row in result]
+
+            colunas_itens = {
+                "produto_id": "INTEGER",
+                "fornecedor_id": "INTEGER",
+                "origem": "VARCHAR(20)",
+                "tipo_item": "VARCHAR(20)",
+                "descricao": "VARCHAR(250)",
+                "quantidade": "NUMERIC(18,3)",
+                "custo_unitario": "NUMERIC(18,2)",
+                "valor_parceiro": "NUMERIC(18,2)",
+                "margem": "NUMERIC(18,2)",
+                "lucro": "NUMERIC(18,2)",
+                "valor_unitario": "NUMERIC(18,2)",
+                "desconto": "NUMERIC(18,2)",
+                "valor_total": "NUMERIC(18,2)",
+                "observacoes": "TEXT",
+            }
+
+            if colunas:
+                for coluna, tipo in colunas_itens.items():
+                    if coluna not in colunas:
+                        db.session.execute(text(f"ALTER TABLE itens_ordem_servico ADD COLUMN {coluna} {tipo}"))
+                        print(f"✅ itens_ordem_servico.{coluna} adicionada")
+        except Exception as e:
+            print("Erro ao verificar itens_ordem_servico:", e)
+
+
+        db.session.commit()
+        print("✅ Tabelas verificadas e corrigidas")
+    except Exception as e:
+        print("Erro ao verificar/corrigir colunas:", e)
+        db.session.rollback()
+
 
 with app.app_context():
     db.create_all()
+    corrigir_colunas_banco()
+    criar_admin_se_nao_existir()
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if "usuario_id" in session:
+        return redirect("/")
+
+    erro = None
+
+    if request.method == "POST":
+        login_digitado = request.form.get("login", "").strip()
+        senha_digitada = request.form.get("senha", "")
+
+        usuario = Usuario.query.filter_by(login=login_digitado, ativo=True).first()
+
+        if usuario and check_password_hash(usuario.senha, senha_digitada):
+            session["usuario_id"] = usuario.id
+            session["usuario_nome"] = usuario.nome
+            session["usuario_perfil"] = usuario.perfil
+            session["empresa_id"] = usuario.empresa_id
+            return redirect("/")
+        else:
+            erro = "Usuário ou senha inválidos"
+
+    return render_template("login.html", erro=erro)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+# ============================================================
+# DASHBOARD COM FILTRO DE DATA
+# ============================================================
 @app.route("/")
+@login_required
 def dashboard():
+    periodo = request.args.get("periodo")
+    data_inicio = request.args.get("data_inicio")
+    data_fim = request.args.get("data_fim")
+
+    query_os = OrdemServico.query
+    hoje = date.today()
+
+    if periodo == "hoje":
+        query_os = query_os.filter(func.date(OrdemServico.data_abertura) == hoje)
+    elif periodo == "semana":
+        inicio_semana = hoje - timedelta(days=hoje.weekday())
+        query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= inicio_semana)
+    elif periodo == "mes":
+        inicio_mes = hoje.replace(day=1)
+        query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= inicio_mes)
+    elif periodo == "ano":
+        inicio_ano = hoje.replace(month=1, day=1)
+        query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= inicio_ano)
+    elif data_inicio:
+        try:
+            di = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+            query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= di)
+            if data_fim:
+                df = datetime.strptime(data_fim, "%Y-%m-%d").date()
+                query_os = query_os.filter(func.date(OrdemServico.data_abertura) <= df)
+        except Exception:
+            pass
+
     total_clientes = Cliente.query.count()
     total_veiculos = Veiculo.query.count()
-    total_ordens = OrdemServico.query.count()
-    faturamento = db.session.query(db.func.sum(OrdemServico.valor_total)).scalar() or 0
+    total_ordens = query_os.count()
+    faturamento = query_os.with_entities(func.coalesce(func.sum(OrdemServico.valor_total), 0)).scalar() or 0
+
+    # Ordens em andamento (ABERTA)
+    ordens_andamento = query_os.filter(OrdemServico.status == "ABERTA").count()
+
+    # Contas a receber = valor das OS abertas
+    contas_receber = query_os.filter(OrdemServico.status == "ABERTA").with_entities(
+        func.coalesce(func.sum(OrdemServico.valor_total), 0)
+    ).scalar() or 0
+
+    # Últimas 8 OS
+    ultimas_ordens = OrdemServico.query.order_by(OrdemServico.id.desc()).limit(8).all()
+
+    # Veículos em atendimento (OS abertas)
+    veiculos_atendimento = (
+        db.session.query(OrdemServico, Veiculo, Cliente)
+        .join(Veiculo, OrdemServico.veiculo_id == Veiculo.id)
+        .join(Cliente, OrdemServico.cliente_id == Cliente.id)
+        .filter(OrdemServico.status == "ABERTA")
+        .order_by(OrdemServico.id.desc())
+        .limit(8)
+        .all()
+    )
+
+    # Produtos com estoque baixo
+    try:
+        produtos_baixo = []
+        for p in Produto.query.order_by(Produto.descricao).all():
+            estoque = float(getattr(p, "estoque_atual", 0) or 0)
+            minimo = float(getattr(p, "estoque_minimo", 0) or 0)
+            if minimo > 0 and estoque <= minimo:
+                produtos_baixo.append(p)
+            elif minimo <= 0 and estoque <= 2:
+                produtos_baixo.append(p)
+        produtos_baixo = produtos_baixo[:8]
+    except Exception:
+        produtos_baixo = []
+
+    # Dados do gráfico — últimos 7 dias
+    labels_grafico = []
+    valores_grafico = []
+    for i in range(6, -1, -1):
+        dia = hoje - timedelta(days=i)
+        labels_grafico.append(dia.strftime("%d/%m"))
+        fat_dia = (
+            OrdemServico.query
+            .filter(func.date(OrdemServico.data_abertura) == dia)
+            .with_entities(func.coalesce(func.sum(OrdemServico.valor_total), 0))
+            .scalar()
+            or 0
+        )
+        valores_grafico.append(float(fat_dia))
+
     try:
         mecanicos = Mecanico.query.filter_by(ativo=True).order_by(Mecanico.nome).all()
     except Exception:
         mecanicos = []
+
     return render_template(
         "dashboard.html",
         total_clientes=total_clientes,
         total_veiculos=total_veiculos,
         total_os=total_ordens,
         faturamento=faturamento,
-        mecanicos=mecanicos
+        mecanicos=mecanicos,
+        periodo=periodo,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        ordens_andamento=ordens_andamento,
+        contas_receber=contas_receber,
+        ultimas_ordens=ultimas_ordens,
+        veiculos_atendimento=veiculos_atendimento,
+        produtos_baixo=produtos_baixo,
+        labels_grafico=labels_grafico,
+        valores_grafico=valores_grafico,
     )
 
 
 @app.route("/clientes")
+@login_required
 def clientes():
     lista_clientes = Cliente.query.order_by(Cliente.nome).all()
     return render_template("clientes.html", clientes=lista_clientes)
 
 
 @app.route("/clientes/novo", methods=["GET", "POST"])
+@login_required
 def novo_cliente():
     if request.method == "POST":
+        cpf = (request.form.get("cpf_cnpj") or "").strip()
+        if cpf:
+            existente = Cliente.query.filter(Cliente.cpf_cnpj == cpf).first()
+            if existente:
+                return redirect(f"/clientes/editar/{existente.id}?aviso=cpf_existente")
+
+        data_nasc = request.form.get("data_nascimento")
         cliente = Cliente(
+            empresa_id=session.get("empresa_id") or 1,
             nome=request.form.get("nome"),
-            cpf_cnpj=request.form.get("cpf_cnpj"),
+            cpf_cnpj=cpf or None,
             telefone=request.form.get("telefone"),
             whatsapp=request.form.get("whatsapp"),
             email=request.form.get("email"),
             endereco=request.form.get("endereco"),
             cidade=request.form.get("cidade"),
             estado=request.form.get("estado"),
-            observacoes=request.form.get("observacoes")
+            observacoes=request.form.get("observacoes"),
+            data_nascimento=datetime.strptime(data_nasc, "%Y-%m-%d").date() if data_nasc else None
         )
         db.session.add(cliente)
         db.session.commit()
@@ -90,9 +403,11 @@ def novo_cliente():
 
 
 @app.route("/clientes/editar/<int:id>", methods=["GET", "POST"])
+@login_required
 def editar_cliente(id):
     cliente = Cliente.query.get_or_404(id)
     if request.method == "POST":
+        data_nasc = request.form.get("data_nascimento")
         cliente.nome = request.form.get("nome")
         cliente.cpf_cnpj = request.form.get("cpf_cnpj")
         cliente.telefone = request.form.get("telefone")
@@ -102,31 +417,43 @@ def editar_cliente(id):
         cliente.cidade = request.form.get("cidade")
         cliente.estado = request.form.get("estado")
         cliente.observacoes = request.form.get("observacoes")
+        cliente.data_nascimento = datetime.strptime(data_nasc, "%Y-%m-%d").date() if data_nasc else None
         db.session.commit()
         return redirect("/clientes")
-    return render_template("novo_cliente.html", cliente=cliente)
+    return render_template("novo_cliente.html", cliente=cliente, aviso=request.args.get("aviso"))
 
 
 @app.route("/clientes/excluir/<int:id>")
+@login_required
 def excluir_cliente(id):
     cliente = Cliente.query.get_or_404(id)
     db.session.delete(cliente)
     db.session.commit()
     return redirect("/clientes")
-
-
 @app.route("/veiculos")
+@login_required
 def veiculos():
     lista_veiculos = Veiculo.query.order_by(Veiculo.placa).all()
     return render_template("veiculos.html", veiculos=lista_veiculos)
 
 
 @app.route("/veiculos/novo", methods=["GET", "POST"])
+@login_required
 def novo_veiculo():
     if request.method == "POST":
+        placa = request.form["placa"].upper().strip()
+
+        existente = Veiculo.query.filter(Veiculo.placa == placa).first()
+        if existente:
+            return redirect(f"/veiculos/editar/{existente.id}?aviso=placa_existente")
+
+        data_rev = request.form.get("proxima_revisao_data")
+        km_rev = request.form.get("proxima_revisao_km")
+
         veiculo = Veiculo(
+            empresa_id=session.get("empresa_id") or 1,
             cliente_id=int(request.form["cliente_id"]),
-            placa=request.form["placa"].upper(),
+            placa=placa,
             marca=request.form.get("marca"),
             modelo=request.form.get("modelo"),
             cor=request.form.get("cor"),
@@ -135,7 +462,9 @@ def novo_veiculo():
             renavam=request.form.get("renavam", ""),
             motor=request.form.get("motor"),
             combustivel=request.form.get("combustivel"),
-            observacoes=request.form.get("observacoes", "")
+            observacoes=request.form.get("observacoes", ""),
+            proxima_revisao_data=datetime.strptime(data_rev, "%Y-%m-%d").date() if data_rev else None,
+            proxima_revisao_km=int(km_rev) if km_rev else None,
         )
         db.session.add(veiculo)
         db.session.commit()
@@ -145,9 +474,15 @@ def novo_veiculo():
 
 
 @app.route("/veiculos/editar/<int:id>", methods=["GET", "POST"])
+@login_required
 def editar_veiculo(id):
     veiculo = Veiculo.query.get_or_404(id)
+    aviso = request.args.get("aviso")
+
     if request.method == "POST":
+        data_rev = request.form.get("proxima_revisao_data")
+        km_rev = request.form.get("proxima_revisao_km")
+
         veiculo.cliente_id = int(request.form["cliente_id"])
         veiculo.placa = request.form["placa"].upper()
         veiculo.marca = request.form.get("marca")
@@ -159,13 +494,22 @@ def editar_veiculo(id):
         veiculo.motor = request.form.get("motor")
         veiculo.combustivel = request.form.get("combustivel")
         veiculo.observacoes = request.form.get("observacoes", "")
+        veiculo.proxima_revisao_data = datetime.strptime(data_rev, "%Y-%m-%d").date() if data_rev else None
+        veiculo.proxima_revisao_km = int(km_rev) if km_rev else None
         db.session.commit()
         return redirect("/veiculos")
+
     clientes = Cliente.query.order_by(Cliente.nome).all()
-    return render_template("novo_veiculo.html", veiculo=veiculo, clientes=clientes)
+    return render_template(
+        "novo_veiculo.html",
+        veiculo=veiculo,
+        clientes=clientes,
+        aviso=aviso
+    )
 
 
 @app.route("/veiculos/excluir/<int:id>")
+@login_required
 def excluir_veiculo(id):
     veiculo = Veiculo.query.get_or_404(id)
     db.session.delete(veiculo)
@@ -173,39 +517,109 @@ def excluir_veiculo(id):
     return redirect("/veiculos")
 
 
+# ============================================================
+# ORDENS COM FILTRO DE DATA + STATUS
+# ============================================================
 @app.route("/ordens")
+@login_required
 def ordens():
-    lista_ordens = OrdemServico.query.order_by(OrdemServico.id.desc()).all()
-    return render_template("ordens.html", ordens=lista_ordens)
+    periodo = request.args.get("periodo")
+    data_inicio = request.args.get("data_inicio")
+    data_fim = request.args.get("data_fim")
+    status = request.args.get("status")
+
+    query = OrdemServico.query
+    hoje = date.today()
+
+    if periodo == "hoje":
+        query = query.filter(func.date(OrdemServico.data_abertura) == hoje)
+    elif periodo == "semana":
+        inicio_semana = hoje - timedelta(days=hoje.weekday())
+        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_semana)
+    elif periodo == "mes":
+        inicio_mes = hoje.replace(day=1)
+        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_mes)
+    elif periodo == "ano":
+        inicio_ano = hoje.replace(month=1, day=1)
+        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_ano)
+    elif data_inicio:
+        try:
+            di = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+            query = query.filter(func.date(OrdemServico.data_abertura) >= di)
+            if data_fim:
+                df = datetime.strptime(data_fim, "%Y-%m-%d").date()
+                query = query.filter(func.date(OrdemServico.data_abertura) <= df)
+        except:
+            pass
+
+    if status:
+        query = query.filter(OrdemServico.status == status)
+
+    lista_ordens = query.order_by(OrdemServico.id.desc()).all()
+
+    return render_template(
+        "ordens.html",
+        ordens=lista_ordens,
+        periodo=periodo,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        status=status
+    )
 
 
 @app.route("/ordens/nova", methods=["GET", "POST"])
+@login_required
 def nova_ordem():
     if request.method == "POST":
         valor_pecas = float(request.form.get("valor_pecas") or 0)
         desconto = float(request.form.get("desconto") or 0)
-        mecanicos_ids = request.form.getlist("mecanicos")
+
+        descs = request.form.getlist("servico_desc")
+        mecs = request.form.getlist("servico_mecanico_id")
+        horas_list = request.form.getlist("servico_horas")
+        minutos_list = request.form.getlist("servico_minutos")
+        vals = request.form.getlist("servico_valor")
+
         nomes = []
         total_servicos = 0.0
         detalhes = []
 
-        for mid in mecanicos_ids:
+        for i in range(len(descs)):
             try:
-                m = Mecanico.query.get(int(mid))
+                mid = int(mecs[i]) if i < len(mecs) and mecs[i] else 0
+                if mid <= 0:
+                    continue
+                m = Mecanico.query.get(mid)
                 if not m:
                     continue
+                serv = (descs[i] or "").strip() or m.nome
+                horas = int(horas_list[i] or 0) if i < len(horas_list) else 0
+                minutos = int(minutos_list[i] or 0) if i < len(minutos_list) else 40
+                dur = (horas * 60) + minutos
+                if dur < 5:
+                    dur = 40
+                val = float(vals[i]) if i < len(vals) and vals[i] else 0
                 nomes.append(m.nome)
-                dur = int(request.form.get(f"duracao_{mid}") or 40)
-                val = float(request.form.get(f"valor_{mid}") or 0)
-                serv = (request.form.get(f"servico_{mid}") or "").strip()
                 total_servicos += val
-                detalhes.append({"mecanico": m, "duracao": dur, "valor": val, "servico": serv or m.nome})
+                detalhes.append({
+                    "mecanico": m,
+                    "duracao": dur,
+                    "valor": val,
+                    "servico": serv,
+                })
             except Exception:
                 pass
 
         total = total_servicos + valor_pecas - desconto
-        ultimo_numero = db.session.query(db.func.max(OrdemServico.numero)).scalar()
-        numero = 1 if ultimo_numero is None else ultimo_numero + 1
+
+        # Número no padrão 20260001, 20260002...
+        ano = date.today().year
+        prefixo = ano * 10000  # 20260000
+        ultimo = db.session.query(func.max(OrdemServico.numero)).scalar() or 0
+        if ultimo < prefixo:
+            numero = prefixo + 1
+        else:
+            numero = ultimo + 1
 
         ordem = OrdemServico(
             numero=numero,
@@ -215,7 +629,7 @@ def nova_ordem():
             defeito_relatado=request.form.get("defeito_relatado"),
             diagnostico=request.form.get("diagnostico"),
             servico_executado=request.form.get("servico_executado"),
-            mecanico=", ".join(nomes) if nomes else None,
+            mecanico=", ".join(dict.fromkeys(nomes)) if nomes else None,
             valor_servicos=total_servicos,
             valor_produtos=valor_pecas,
             desconto=desconto,
@@ -223,7 +637,7 @@ def nova_ordem():
             status="ABERTA",
         )
         try:
-            ordem.empresa_id = 1
+            ordem.empresa_id = session.get("empresa_id") or 1
         except Exception:
             pass
 
@@ -247,19 +661,22 @@ def nova_ordem():
                 percentual_comissao=perc,
                 base_comissao=base,
                 valor_comissao=comissao,
+                descricao_servico=d["servico"],
             ))
             if agendar:
                 entrada = int(m.hora_entrada or 9)
                 almoco_i = int(m.almoco_inicio or 12)
                 almoco_f = int(m.almoco_fim or 14)
-                ocupados = Agendamento.query.filter_by(mecanico_id=m.id, data=hoje).order_by(Agendamento.hora_inicio).all()
+                ocupados = Agendamento.query.filter_by(
+                    mecanico_id=m.id, data=hoje
+                ).order_by(Agendamento.hora_inicio).all()
                 cursor = entrada * 60
                 for ag in ocupados:
                     try:
                         h, mi = map(int, ag.hora_inicio.split(":"))
                         ini = h * 60 + mi
-                        dur = ag.duracao_real_min or ag.duracao_estimada_min or 40
-                        fim = ini + dur
+                        dur_ag = ag.duracao_real_min or ag.duracao_estimada_min or 40
+                        fim = ini + dur_ag
                         if fim > cursor:
                             cursor = fim
                     except Exception:
@@ -290,6 +707,70 @@ def nova_ordem():
                     descricao=desc,
                     status="AGENDADO",
                 ))
+                # ===== PEÇAS / PRODUTOS =====
+        produtos_ids = request.form.getlist("item_produto_id")
+        tipos = request.form.getlist("item_tipo")
+        descricoes = request.form.getlist("item_descricao")
+        qtds = request.form.getlist("item_qtd")
+        valores_unit = request.form.getlist("item_valor_unit")
+
+        n = max(len(produtos_ids), len(tipos), len(descricoes), len(qtds), len(valores_unit))
+
+        for i in range(n):
+            try:
+                tipo = (tipos[i] if i < len(tipos) else "ESTOQUE") or "ESTOQUE"
+                tipo = tipo.upper().strip()
+
+                try:
+                    pid = int(produtos_ids[i] or 0) if i < len(produtos_ids) else 0
+                except Exception:
+                    pid = 0
+
+                desc = (descricoes[i] if i < len(descricoes) else "") or ""
+                desc = desc.strip()
+
+                try:
+                    qtd = float(qtds[i] if i < len(qtds) else 1)
+                except Exception:
+                    qtd = 1.0
+
+                try:
+                    vu = float(valores_unit[i] if i < len(valores_unit) else 0)
+                except Exception:
+                    vu = 0.0
+
+                if qtd <= 0:
+                    continue
+
+                prod = None
+                if tipo == "ESTOQUE" and pid > 0:
+                    prod = Produto.query.get(pid)
+                    if prod and not desc:
+                        desc = prod.descricao or f"Produto #{pid}"
+                elif not desc:
+                    continue
+
+                if not desc:
+                    desc = "Peça"
+
+                item = ItemOrdemServico(
+                    ordem_servico_id=ordem.id,
+                    produto_id=pid if pid > 0 else None,
+                    origem=tipo if tipo in ("ESTOQUE", "PARCEIRO") else "ESTOQUE",
+                    tipo_item="PRODUTO",
+                    descricao=desc,
+                    quantidade=qtd,
+                    valor_unitario=vu,
+                    valor_total=qtd * vu,
+                )
+                db.session.add(item)
+
+                if prod is not None and hasattr(prod, "estoque_atual"):
+                    atual = float(prod.estoque_atual or 0)
+                    prod.estoque_atual = max(0, atual - qtd)
+
+            except Exception as e:
+                print("Erro item OS:", e)
 
         db.session.commit()
         return redirect("/ordens")
@@ -308,6 +789,7 @@ def nova_ordem():
         lista_fornecedores = Fornecedor.query.order_by(Fornecedor.razao_social).all()
     except Exception:
         lista_fornecedores = []
+
     return render_template(
         "nova_ordem.html",
         clientes=clientes,
@@ -319,6 +801,7 @@ def nova_ordem():
 
 
 @app.route("/ordens/editar/<int:id>", methods=["GET", "POST"])
+@login_required
 def editar_ordem(id):
     ordem = OrdemServico.query.get_or_404(id)
     if request.method == "POST":
@@ -346,6 +829,7 @@ def editar_ordem(id):
 
 
 @app.route("/ordens/finalizar/<int:id>")
+@login_required
 def finalizar_ordem(id):
     ordem = OrdemServico.query.get_or_404(id)
     ordem.status = "FINALIZADA"
@@ -354,6 +838,7 @@ def finalizar_ordem(id):
 
 
 @app.route("/ordens/excluir/<int:id>")
+@login_required
 def excluir_ordem(id):
     ordem = OrdemServico.query.get_or_404(id)
     db.session.delete(ordem)
@@ -362,6 +847,7 @@ def excluir_ordem(id):
 
 
 @app.route("/ordens/pdf/<int:id>")
+@login_required
 def pdf_ordem(id):
     ordem = OrdemServico.query.get_or_404(id)
     pdf = gerar_pdf_ordem(ordem)
@@ -369,6 +855,7 @@ def pdf_ordem(id):
 
 
 @app.route("/api/veiculos/<int:cliente_id>")
+@login_required
 def api_veiculos(cliente_id):
     lista = Veiculo.query.filter_by(cliente_id=cliente_id).order_by(Veiculo.placa).all()
     return jsonify([
@@ -378,6 +865,7 @@ def api_veiculos(cliente_id):
 
 
 @app.route("/dashboard/dados")
+@login_required
 def dashboard_dados():
     total_clientes = Cliente.query.count()
     total_veiculos = Veiculo.query.count()
@@ -387,6 +875,7 @@ def dashboard_dados():
 
 
 @app.route("/estoque")
+@login_required
 def estoque():
     try:
         lista_produtos = Produto.query.order_by(Produto.descricao).all()
@@ -431,11 +920,13 @@ def estoque():
 
 
 @app.route("/produtos")
+@login_required
 def produtos():
     return redirect("/estoque")
 
 
 @app.route("/produtos/novo", methods=["GET", "POST"])
+@login_required
 def novo_produto():
     if request.method == "POST":
         try:
@@ -481,6 +972,7 @@ def novo_produto():
 
 
 @app.route("/produtos/editar/<int:id>", methods=["GET", "POST"])
+@login_required
 def editar_produto(id):
     produto = Produto.query.get_or_404(id)
     if request.method == "POST":
@@ -516,6 +1008,7 @@ def editar_produto(id):
 
 
 @app.route("/produtos/excluir/<int:id>")
+@login_required
 def excluir_produto(id):
     produto = Produto.query.get_or_404(id)
     try:
@@ -525,9 +1018,8 @@ def excluir_produto(id):
         db.session.rollback()
         print("Erro excluir produto:", e)
     return redirect("/estoque")
-
-
 @app.route("/categorias")
+@login_required
 def categorias():
     try:
         lista = Categoria.query.order_by(Categoria.nome).all()
@@ -538,6 +1030,7 @@ def categorias():
 
 @app.route("/categorias/novo", methods=["GET", "POST"])
 @app.route("/categorias/salvar", methods=["POST"])
+@login_required
 def nova_categoria():
     if request.method == "POST":
         try:
@@ -571,6 +1064,7 @@ def nova_categoria():
 
 
 @app.route("/categorias/excluir/<int:id>")
+@login_required
 def excluir_categoria(id):
     try:
         cat = Categoria.query.get_or_404(id)
@@ -583,6 +1077,7 @@ def excluir_categoria(id):
 
 
 @app.route("/fabricantes")
+@login_required
 def fabricantes():
     try:
         lista = Fabricante.query.order_by(Fabricante.nome).all()
@@ -593,6 +1088,7 @@ def fabricantes():
 
 @app.route("/fabricantes/novo", methods=["GET", "POST"])
 @app.route("/fabricantes/salvar", methods=["POST"])
+@login_required
 def novo_fabricante():
     if request.method == "POST":
         try:
@@ -616,6 +1112,7 @@ def novo_fabricante():
 
 
 @app.route("/fabricantes/excluir/<int:id>")
+@login_required
 def excluir_fabricante(id):
     try:
         fab = Fabricante.query.get_or_404(id)
@@ -628,6 +1125,7 @@ def excluir_fabricante(id):
 
 
 @app.route("/fornecedores")
+@login_required
 def fornecedores():
     try:
         lista = Fornecedor.query.order_by(Fornecedor.razao_social).all()
@@ -638,6 +1136,7 @@ def fornecedores():
 
 @app.route("/fornecedores/novo", methods=["GET", "POST"])
 @app.route("/fornecedores/salvar", methods=["POST"])
+@login_required
 def novo_fornecedor():
     if request.method == "POST":
         try:
@@ -698,6 +1197,7 @@ def novo_fornecedor():
 
 
 @app.route("/fornecedores/excluir/<int:id>")
+@login_required
 def excluir_fornecedor(id):
     try:
         forn = Fornecedor.query.get_or_404(id)
@@ -710,6 +1210,7 @@ def excluir_fornecedor(id):
 
 
 @app.route("/compras")
+@login_required
 def compras():
     try:
         lista = Compra.query.order_by(Compra.id.desc()).all()
@@ -745,14 +1246,11 @@ def compras():
 
 
 @app.route("/compras/salvar", methods=["POST"])
+@login_required
 def salvar_compra():
     try:
-        print("=== POST /compras/salvar ===")
-        print("form:", dict(request.form))
-
         fornecedor_id = int(request.form.get("fornecedor_id") or 0)
         if not fornecedor_id:
-            print("Sem fornecedor")
             return redirect("/compras")
 
         data_str = request.form.get("data_compra") or ""
@@ -802,10 +1300,8 @@ def salvar_compra():
 
         itens = list(mapa.values())
         valor_total = sum(it["qtd"] * it["custo"] for it in itens)
-        print("itens:", itens, "total:", valor_total)
 
         if not itens:
-            print("Nenhum item válido")
             return redirect("/compras")
 
         compra = Compra()
@@ -853,29 +1349,7 @@ def salvar_compra():
                     if hasattr(prod, "preco_compra") and it["custo"] > 0:
                         prod.preco_compra = it["custo"]
 
-                    # SQL direto — preenche a coluna obrigatória "tipo"
-                    try:
-                        db.session.execute(
-                            text(
-                                "INSERT INTO movimentacoes_estoque "
-                                "(empresa_id, produto_id, tipo, quantidade, origem, observacoes, data_movimento) "
-                                "VALUES (:empresa_id, :produto_id, :tipo, :quantidade, :origem, :obs, :data_mov)"
-                            ),
-                            {
-                                "empresa_id": 1,
-                                "produto_id": prod.id,
-                                "tipo": "ENTRADA",
-                                "quantidade": it["qtd"],
-                                "origem": "COMPRA",
-                                "obs": "Compra NF {}".format(numero_nf or compra.id),
-                                "data_mov": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                            },
-                        )
-                    except Exception as e_mov:
-                        print("Aviso movimentacao (compra continua salva):", e_mov)
-
         db.session.commit()
-        print("Compra salva id=", compra.id, "total=", valor_total)
     except Exception as e:
         db.session.rollback()
         print("Erro compra:", type(e).__name__, e)
@@ -884,6 +1358,7 @@ def salvar_compra():
 
 
 @app.route("/compras/ver/<int:id>")
+@login_required
 def ver_compra(id):
     compra = Compra.query.get_or_404(id)
     try:
@@ -894,6 +1369,7 @@ def ver_compra(id):
 
 
 @app.route("/compras/excluir/<int:id>")
+@login_required
 def excluir_compra(id):
     try:
         compra = Compra.query.get_or_404(id)
@@ -910,6 +1386,7 @@ def excluir_compra(id):
 
 
 @app.route("/inventario")
+@login_required
 def inventario():
     try:
         lista = Inventario.query.order_by(Inventario.id.desc()).all()
@@ -919,6 +1396,7 @@ def inventario():
 
 
 @app.route("/movimentacoes")
+@login_required
 def movimentacoes():
     try:
         lista = MovimentacaoEstoque.query.order_by(MovimentacaoEstoque.id.desc()).all()
@@ -927,38 +1405,214 @@ def movimentacoes():
     return render_template("movimentacoes.html", movimentacoes=lista, total_movimentacoes=len(lista))
 
 
+# ============================================================
+# FINANCEIRO
+# ============================================================
 @app.route("/financeiro")
+@login_required
 def financeiro():
+    periodo = request.args.get("periodo")
+    data_inicio = request.args.get("data_inicio")
+    data_fim = request.args.get("data_fim")
+
+    query = OrdemServico.query
+    hoje = date.today()
+
+    if periodo == "hoje":
+        query = query.filter(func.date(OrdemServico.data_abertura) == hoje)
+    elif periodo == "semana":
+        inicio_semana = hoje - timedelta(days=hoje.weekday())
+        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_semana)
+    elif periodo == "mes":
+        inicio_mes = hoje.replace(day=1)
+        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_mes)
+    elif periodo == "ano":
+        inicio_ano = hoje.replace(month=1, day=1)
+        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_ano)
+    elif data_inicio:
+        try:
+            di = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+            query = query.filter(func.date(OrdemServico.data_abertura) >= di)
+            if data_fim:
+                df = datetime.strptime(data_fim, "%Y-%m-%d").date()
+                query = query.filter(func.date(OrdemServico.data_abertura) <= df)
+        except:
+            pass
+
     try:
-        total_ordens = OrdemServico.query.count()
-        faturamento = db.session.query(db.func.sum(OrdemServico.valor_total)).scalar() or 0
-        abertas = OrdemServico.query.filter_by(status="ABERTA").count()
-        finalizadas = OrdemServico.query.filter_by(status="FINALIZADA").count()
+        total_ordens = query.count()
+        faturamento = query.with_entities(func.coalesce(func.sum(OrdemServico.valor_total), 0)).scalar() or 0
+        abertas = query.filter(OrdemServico.status == "ABERTA").count()
+        finalizadas = query.filter(OrdemServico.status == "FINALIZADA").count()
     except Exception:
         total_ordens = 0
         faturamento = 0
         abertas = 0
         finalizadas = 0
+
     return render_template(
         "financeiro.html",
         total_ordens=total_ordens,
         faturamento=faturamento,
         abertas=abertas,
-        finalizadas=finalizadas
+        finalizadas=finalizadas,
+        periodo=periodo,
+        data_inicio=data_inicio,
+        data_fim=data_fim
     )
 
 
+# ============================================================
+# USUÁRIOS
+# ============================================================
 @app.route("/usuarios")
+@login_required
 def usuarios():
-    return render_template("usuarios.html")
+    lista = Usuario.query.order_by(Usuario.nome).all()
+    return render_template("usuarios.html", usuarios=lista)
 
 
-@app.route("/configuracoes")
+@app.route("/usuarios/novo", methods=["GET", "POST"])
+@login_required
+def novo_usuario():
+    if request.method == "POST":
+        try:
+            login = request.form.get("login", "").strip()
+            if Usuario.query.filter_by(login=login).first():
+                return render_template("novo_usuario.html", erro="Login já existe")
+
+            usuario = Usuario(
+                empresa_id=session.get("empresa_id") or 1,
+                nome=request.form.get("nome"),
+                login=login,
+                senha=generate_password_hash(request.form.get("senha") or "123456"),
+                email=request.form.get("email"),
+                perfil=request.form.get("perfil") or "CONSULTOR",
+                ativo=True if request.form.get("ativo") == "on" else False
+            )
+            db.session.add(usuario)
+            db.session.commit()
+            return redirect("/usuarios")
+        except Exception as e:
+            db.session.rollback()
+            print("Erro novo usuário:", e)
+            return render_template("novo_usuario.html", erro=str(e))
+    return render_template("novo_usuario.html")
+
+
+@app.route("/usuarios/editar/<int:id>", methods=["GET", "POST"])
+@login_required
+def editar_usuario(id):
+    usuario = Usuario.query.get_or_404(id)
+    if request.method == "POST":
+        try:
+            usuario.nome = request.form.get("nome")
+            usuario.email = request.form.get("email")
+            usuario.perfil = request.form.get("perfil") or "CONSULTOR"
+            usuario.ativo = True if request.form.get("ativo") == "on" else False
+
+            nova_senha = request.form.get("senha")
+            if nova_senha:
+                usuario.senha = generate_password_hash(nova_senha)
+
+            db.session.commit()
+            return redirect("/usuarios")
+        except Exception as e:
+            db.session.rollback()
+            print("Erro editar usuário:", e)
+    return render_template("novo_usuario.html", usuario=usuario)
+
+
+@app.route("/usuarios/resetar-senha/<int:id>")
+@login_required
+def resetar_senha(id):
+    usuario = Usuario.query.get_or_404(id)
+    usuario.senha = generate_password_hash("123456")
+    db.session.commit()
+    return redirect("/usuarios")
+
+
+@app.route("/usuarios/excluir/<int:id>")
+@login_required
+def excluir_usuario(id):
+    if id == session.get("usuario_id"):
+        return redirect("/usuarios")
+    usuario = Usuario.query.get_or_404(id)
+    db.session.delete(usuario)
+    db.session.commit()
+    return redirect("/usuarios")
+
+
+# ============================================================
+# CONFIGURAÇÕES
+# ============================================================
+@app.route("/configuracoes", methods=["GET", "POST"])
+@login_required
 def configuracoes():
-    return render_template("configuracoes.html")
+    empresa = Empresa.query.first()
+    usuario = Usuario.query.get(session.get("usuario_id"))
+
+    mensagem = None
+    erro = None
+
+    if request.method == "POST":
+        acao = request.form.get("acao")
+
+        if acao == "empresa":
+            try:
+                if not empresa:
+                    empresa = Empresa(cnpj=request.form.get("cnpj") or "00.000.000/0001-00")
+                    db.session.add(empresa)
+
+                empresa.razao_social = request.form.get("razao_social")
+                empresa.nome_fantasia = request.form.get("nome_fantasia")
+                empresa.cnpj = request.form.get("cnpj")
+                empresa.inscricao_estadual = request.form.get("inscricao_estadual")
+                empresa.telefone = request.form.get("telefone")
+                empresa.whatsapp = request.form.get("whatsapp")
+                empresa.email = request.form.get("email")
+                empresa.site = request.form.get("site")
+                empresa.cep = request.form.get("cep")
+                empresa.endereco = request.form.get("endereco")
+                empresa.numero = request.form.get("numero")
+                empresa.complemento = request.form.get("complemento")
+                empresa.bairro = request.form.get("bairro")
+                empresa.cidade = request.form.get("cidade")
+                empresa.estado = request.form.get("estado")
+
+                db.session.commit()
+                mensagem = "Dados da empresa salvos com sucesso!"
+            except Exception as e:
+                db.session.rollback()
+                erro = f"Erro ao salvar empresa: {e}"
+
+        elif acao == "senha":
+            senha_atual = request.form.get("senha_atual")
+            nova_senha = request.form.get("nova_senha")
+            confirma = request.form.get("confirma_senha")
+
+            if not check_password_hash(usuario.senha, senha_atual):
+                erro = "Senha atual incorreta"
+            elif nova_senha != confirma:
+                erro = "Nova senha e confirmação não conferem"
+            elif len(nova_senha) < 6:
+                erro = "A nova senha deve ter no mínimo 6 caracteres"
+            else:
+                usuario.senha = generate_password_hash(nova_senha)
+                db.session.commit()
+                mensagem = "Senha alterada com sucesso!"
+
+    return render_template(
+        "configuracoes.html",
+        empresa=empresa,
+        usuario=usuario,
+        mensagem=mensagem,
+        erro=erro
+    )
 
 
 @app.route("/mecanicos")
+@login_required
 def mecanicos():
     try:
         lista = Mecanico.query.order_by(Mecanico.nome).all()
@@ -968,6 +1622,7 @@ def mecanicos():
 
 
 @app.route("/mecanicos/novo", methods=["GET", "POST"])
+@login_required
 def novo_mecanico():
     if request.method == "POST":
         try:
@@ -995,6 +1650,7 @@ def novo_mecanico():
 
 
 @app.route("/mecanicos/editar/<int:id>", methods=["GET", "POST"])
+@login_required
 def editar_mecanico(id):
     mecanico = Mecanico.query.get_or_404(id)
     if request.method == "POST":
@@ -1020,6 +1676,7 @@ def editar_mecanico(id):
 
 
 @app.route("/mecanicos/excluir/<int:id>")
+@login_required
 def excluir_mecanico(id):
     m = Mecanico.query.get_or_404(id)
     db.session.delete(m)
@@ -1028,6 +1685,7 @@ def excluir_mecanico(id):
 
 
 @app.route("/api/agenda")
+@login_required
 def api_agenda():
     try:
         mecanico_id = int(request.args.get("mecanico_id") or 0)
@@ -1055,6 +1713,7 @@ def api_agenda():
 
 
 @app.route("/api/agenda/criar", methods=["POST"])
+@login_required
 def api_agenda_criar():
     data = request.get_json(silent=True) or {}
     try:
@@ -1097,6 +1756,7 @@ def api_agenda_criar():
 
 
 @app.route("/api/agenda/atualizar/<int:id>", methods=["POST"])
+@login_required
 def api_agenda_atualizar(id):
     ag = Agendamento.query.get_or_404(id)
     data = request.get_json(silent=True) or {}
@@ -1127,6 +1787,7 @@ def api_agenda_atualizar(id):
 
 
 @app.route("/api/agenda/excluir/<int:id>", methods=["POST"])
+@login_required
 def api_agenda_excluir(id):
     ag = Agendamento.query.get_or_404(id)
     db.session.delete(ag)

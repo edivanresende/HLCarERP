@@ -1,29 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}
-Editar Ordem de Serviço
-{% endblock %}
+{% block title %}Editar Ordem de Serviço{% endblock %}
 
 {% block conteudo %}
-
 <div class="container-fluid">
 
-    <h2 class="mb-4 text-white">
-        Editar Ordem de Serviço
-    </h2>
+    <h2 class="mb-4 text-white">Editar Ordem de Serviço Nº {{ ordem.numero }}</h2>
 
     <div class="card-dashboard">
-
-        <form method="POST">
+        <form method="POST" id="form-os">
 
             <div class="row">
 
                 <div class="col-md-6 mb-3">
-                    <label>Cliente</label>
-                    <select name="cliente_id" class="form-control" required>
+                    <label class="text-secondary">Cliente</label>
+                    <select name="cliente_id" id="cliente_id" class="form-control bg-dark text-white border-secondary" required>
+                        <option value="">Selecione...</option>
                         {% for cliente in clientes %}
-                        <option value="{{ cliente.id }}"
-                            {% if cliente.id == ordem.cliente_id %}selected{% endif %}>
+                        <option value="{{ cliente.id }}" {% if ordem.cliente_id == cliente.id %}selected{% endif %}>
                             {{ cliente.nome }}
                         </option>
                         {% endfor %}
@@ -31,11 +25,12 @@ Editar Ordem de Serviço
                 </div>
 
                 <div class="col-md-6 mb-3">
-                    <label>Veículo</label>
-                    <select name="veiculo_id" class="form-control" required>
+                    <label class="text-secondary">Veículo</label>
+                    <select name="veiculo_id" id="veiculo_id" class="form-control bg-dark text-white border-secondary" required>
+                        <option value="">Selecione...</option>
                         {% for veiculo in veiculos %}
-                        <option value="{{ veiculo.id }}"
-                            {% if veiculo.id == ordem.veiculo_id %}selected{% endif %}>
+                        <option value="{{ veiculo.id }}" data-cliente="{{ veiculo.cliente_id }}"
+                            {% if ordem.veiculo_id == veiculo.id %}selected{% endif %}>
                             {{ veiculo.placa }} - {{ veiculo.modelo }}
                         </option>
                         {% endfor %}
@@ -43,65 +38,308 @@ Editar Ordem de Serviço
                 </div>
 
                 <div class="col-md-3 mb-3">
-                    <label>KM</label>
-                    <input type="number" name="km" value="{{ ordem.km or '' }}" class="form-control">
-                </div>
-
-                <div class="col-md-9 mb-3">
-                    <label>Mecânico</label>
-                    <input type="text" name="mecanico" value="{{ ordem.mecanico or '' }}" class="form-control">
-                </div>
-
-                <div class="col-12 mb-3">
-                    <label>Defeito Relatado</label>
-                    <textarea name="defeito_relatado" rows="3" class="form-control">{{ ordem.defeito_relatado or '' }}</textarea>
-                </div>
-
-                <div class="col-12 mb-3">
-                    <label>Diagnóstico</label>
-                    <textarea name="diagnostico" rows="3" class="form-control">{{ ordem.diagnostico or '' }}</textarea>
-                </div>
-
-                <div class="col-12 mb-3">
-                    <label>Serviço Executado</label>
-                    <textarea name="servico_executado" rows="3" class="form-control">{{ ordem.servico_executado or '' }}</textarea>
+                    <label class="text-secondary">KM</label>
+                    <input type="number" name="km" class="form-control bg-dark text-white border-secondary"
+                           value="{{ ordem.km or '' }}">
                 </div>
 
                 <div class="col-md-3 mb-3">
-                    <label>Valor Serviços</label>
-                    <input type="number" step="0.01" name="valor_servicos"
-                           value="{{ ordem.valor_servicos or 0 }}" class="form-control">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label>Valor Peças</label>
-                    <input type="number" step="0.01" name="valor_pecas"
-                           value="{{ ordem.valor_produtos or 0 }}" class="form-control">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label>Desconto</label>
-                    <input type="number" step="0.01" name="desconto"
-                           value="{{ ordem.desconto or 0 }}" class="form-control">
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label>Status</label>
-                    <select name="status" class="form-control">
-                        <option value="ABERTA" {% if ordem.status == "ABERTA" %}selected{% endif %}>ABERTA</option>
-                        <option value="FINALIZADA" {% if ordem.status == "FINALIZADA" %}selected{% endif %}>FINALIZADA</option>
+                    <label class="text-secondary">Status</label>
+                    <select name="status" class="form-control bg-dark text-white border-secondary">
+                        {% for st in ["ABERTA", "EM_ANDAMENTO", "FINALIZADA", "CANCELADA"] %}
+                        <option value="{{ st }}" {% if ordem.status == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
                     </select>
+                </div>
+
+                <!-- SERVIÇOS -->
+                <div class="col-12 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="text-secondary mb-0">Serviços</label>
+                        <button type="button" class="btn btn-sm btn-warning" onclick="adicionarServico()">+ Serviço</button>
+                    </div>
+                    <div class="table-responsive rounded" style="background:#0f172a;border:1px solid #333;">
+                        <table class="table table-dark table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Descrição do serviço</th>
+                                    <th style="width:200px">Mecânico</th>
+                                    <th style="width:140px">Tempo (h / min)</th>
+                                    <th style="width:130px">Valor (R$)</th>
+                                    <th style="width:50px"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpo-servicos"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end text-secondary">Total serviços</td>
+                                    <td><strong id="total-servicos-label">R$ 0,00</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="col-12 mb-3">
+                    <label class="text-secondary">Defeito Relatado</label>
+                    <textarea name="defeito_relatado" rows="2" class="form-control bg-dark text-white border-secondary">{{ ordem.defeito_relatado or '' }}</textarea>
+                </div>
+
+                <div class="col-12 mb-3">
+                    <label class="text-secondary">Diagnóstico</label>
+                    <textarea name="diagnostico" rows="2" class="form-control bg-dark text-white border-secondary">{{ ordem.diagnostico or '' }}</textarea>
+                </div>
+
+                <div class="col-12 mb-3">
+                    <label class="text-secondary">Serviço Executado (geral)</label>
+                    <textarea name="servico_executado" rows="2" class="form-control bg-dark text-white border-secondary">{{ ordem.servico_executado or '' }}</textarea>
+                </div>
+
+                <!-- PEÇAS -->
+                <div class="col-12 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="text-secondary mb-0">Peças / Produtos</label>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="adicionarPeca('ESTOQUE')">+ Estoque</button>
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="adicionarPeca('PARCEIRO')">+ Parceiro</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive rounded" style="background:#0f172a;border:1px solid #333;">
+                        <table class="table table-dark table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:110px">Origem</th>
+                                    <th>Descrição / Produto</th>
+                                    <th style="width:90px">Qtd</th>
+                                    <th style="width:120px">Valor unit.</th>
+                                    <th style="width:120px">Total</th>
+                                    <th style="width:50px"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpo-pecas"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" class="text-end text-secondary">Total peças</td>
+                                    <td><strong id="total-pecas-label">R$ 0,00</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <input type="hidden" name="valor_pecas" id="valor_pecas" value="0">
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="text-secondary">Desconto</label>
+                    <input type="number" step="0.01" name="desconto" id="desconto"
+                           class="form-control bg-dark text-white border-secondary"
+                           value="{{ '%.2f'|format(ordem.desconto or 0) }}"
+                           oninput="recalcularTotais()">
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="text-secondary">Total da OS</label>
+                    <div class="form-control bg-dark text-success border-secondary fw-bold" id="total-os-label">R$ 0,00</div>
                 </div>
 
             </div>
 
-            <button class="btn btn-success">Salvar Alterações</button>
+            <button type="submit" class="btn btn-success">Salvar Alterações</button>
             <a href="/ordens" class="btn btn-secondary">Cancelar</a>
 
         </form>
-
     </div>
-
 </div>
 
+<script type="application/json" id="dados-produtos">
+[
+{% for p in produtos %}
+  {"id": {{ p.id }}, "codigo": {{ (p.codigo or "")|tojson }}, "descricao": {{ (p.descricao or "")|tojson }},
+   "preco": {{ (p.preco_venda or 0)|float }}, "estoque": {{ (p.estoque_atual or 0)|float }}}{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script type="application/json" id="dados-mecanicos">
+[
+{% for m in mecanicos %}
+  {"id": {{ m.id }}, "nome": {{ (m.nome or "")|tojson }}}{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script type="application/json" id="dados-servicos-existentes">
+[
+{% for s in servicos_os %}
+  {
+    "desc": {{ (s.descricao_servico or "")|tojson }},
+    "mecanico_id": {{ s.mecanico_id or 0 }},
+    "duracao": {{ s.duracao_estimada_min or 40 }},
+    "valor": {{ (s.valor_negociado or 0)|float }}
+  }{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script type="application/json" id="dados-pecas-existentes">
+[
+{% for it in itens_os %}
+  {
+    "origem": {{ (it.origem or "ESTOQUE")|tojson }},
+    "produto_id": {{ it.produto_id or 0 }},
+    "descricao": {{ (it.descricao or "")|tojson }},
+    "qtd": {{ (it.quantidade or 1)|float }},
+    "valor_unit": {{ (it.valor_unitario or 0)|float }}
+  }{% if not loop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script>
+let contadorPeca = 0;
+let contadorServico = 0;
+const produtos = JSON.parse(document.getElementById('dados-produtos').textContent || '[]');
+const mecanicos = JSON.parse(document.getElementById('dados-mecanicos').textContent || '[]');
+const servicosExistentes = JSON.parse(document.getElementById('dados-servicos-existentes').textContent || '[]');
+const pecasExistentes = JSON.parse(document.getElementById('dados-pecas-existentes').textContent || '[]');
+
+function formatMoney(v) {
+    return 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ',');
+}
+
+function opcoesMecanicos(selectedId) {
+    let opts = '<option value="">Selecione...</option>';
+    mecanicos.forEach(function (m) {
+        opts += '<option value="' + m.id + '"' + (selectedId == m.id ? ' selected' : '') + '>' + m.nome + '</option>';
+    });
+    return opts;
+}
+
+function adicionarServico(dados) {
+    contadorServico += 1;
+    const id = contadorServico;
+    const d = dados || {};
+    const horas = Math.floor((d.duracao || 40) / 60);
+    const minutos = (d.duracao || 40) % 60;
+    const tr = document.createElement('tr');
+    tr.id = 'servico-row-' + id;
+    tr.innerHTML =
+        '<td><input type="text" name="servico_desc" class="form-control form-control-sm bg-dark text-white border-secondary" ' +
+        'value="' + (d.desc || '').replace(/"/g, '&quot;') + '" required></td>' +
+        '<td><select name="servico_mecanico_id" class="form-select form-select-sm bg-dark text-white border-secondary" required>' +
+        opcoesMecanicos(d.mecanico_id) + '</select></td>' +
+        '<td><div class="d-flex gap-1 align-items-center">' +
+        '<input type="number" name="servico_horas" value="' + horas + '" min="0" class="form-control form-control-sm bg-dark text-white border-secondary" style="width:55px">' +
+        '<span class="text-secondary small">h</span>' +
+        '<input type="number" name="servico_minutos" value="' + minutos + '" min="0" max="59" class="form-control form-control-sm bg-dark text-white border-secondary" style="width:55px">' +
+        '<span class="text-secondary small">m</span></div></td>' +
+        '<td><input type="number" name="servico_valor" value="' + (d.valor || 0) + '" min="0" step="0.01" ' +
+        'class="form-control form-control-sm bg-dark text-white border-secondary" oninput="recalcularTotais()"></td>' +
+        '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServico(' + id + ')"><i class="fa fa-times"></i></button></td>';
+    document.getElementById('corpo-servicos').appendChild(tr);
+    recalcularTotais();
+}
+
+function removerServico(id) {
+    const row = document.getElementById('servico-row-' + id);
+    if (row) row.remove();
+    recalcularTotais();
+}
+
+function adicionarPeca(origem, dados) {
+    contadorPeca += 1;
+    const id = contadorPeca;
+    const d = dados || {};
+    origem = (d.origem || origem || 'ESTOQUE').toUpperCase();
+    const tr = document.createElement('tr');
+    tr.id = 'peca-row-' + id;
+
+    let descHtml = '';
+    if (origem === 'ESTOQUE') {
+        let opts = '<option value="">Selecione o produto...</option>';
+        produtos.forEach(function (p) {
+            opts += '<option value="' + p.id + '" data-preco="' + p.preco + '"' +
+                (d.produto_id == p.id ? ' selected' : '') + '>' +
+                (p.codigo ? p.codigo + ' - ' : '') + p.descricao + '</option>';
+        });
+        descHtml =
+            '<input type="hidden" name="item_tipo" value="ESTOQUE">' +
+            '<input type="hidden" name="item_descricao" id="item_desc_' + id + '" value="' + (d.descricao || '').replace(/"/g, '&quot;') + '">' +
+            '<select name="item_produto_id" class="form-select form-select-sm bg-dark text-white border-secondary" ' +
+            'onchange="produtoSelecionado(' + id + ', this)">' + opts + '</select>';
+    } else {
+        descHtml =
+            '<input type="hidden" name="item_tipo" value="PARCEIRO">' +
+            '<input type="hidden" name="item_produto_id" value="">' +
+            '<input type="text" name="item_descricao" class="form-control form-control-sm bg-dark text-white border-secondary" ' +
+            'value="' + (d.descricao || '').replace(/"/g, '&quot;') + '" required>';
+    }
+
+    tr.innerHTML =
+        '<td><span class="badge ' + (origem === 'ESTOQUE' ? 'bg-info' : 'bg-warning text-dark') + '">' + origem + '</span></td>' +
+        '<td>' + descHtml + '</td>' +
+        '<td><input type="number" name="item_qtd" value="' + (d.qtd || 1) + '" min="0.01" step="0.01" ' +
+        'class="form-control form-control-sm bg-dark text-white border-secondary" oninput="recalcularLinha(' + id + ')"></td>' +
+        '<td><input type="number" name="item_valor_unit" id="item_vu_' + id + '" value="' + (d.valor_unit || 0) + '" min="0" step="0.01" ' +
+        'class="form-control form-control-sm bg-dark text-white border-secondary" oninput="recalcularLinha(' + id + ')"></td>' +
+        '<td><span id="item_total_' + id + '">R$ 0,00</span></td>' +
+        '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerPeca(' + id + ')"><i class="fa fa-times"></i></button></td>';
+
+    document.getElementById('corpo-pecas').appendChild(tr);
+    recalcularLinha(id);
+}
+
+function produtoSelecionado(id, sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const preco = parseFloat(opt.getAttribute('data-preco') || 0);
+    document.getElementById('item_vu_' + id).value = preco.toFixed(2);
+    const hiddenDesc = document.getElementById('item_desc_' + id);
+    if (hiddenDesc) hiddenDesc.value = opt.textContent || '';
+    recalcularLinha(id);
+}
+
+function recalcularLinha(id) {
+    const row = document.getElementById('peca-row-' + id);
+    if (!row) return;
+    const qtd = parseFloat(row.querySelector('[name="item_qtd"]').value || 0);
+    const vu = parseFloat(row.querySelector('[name="item_valor_unit"]').value || 0);
+    document.getElementById('item_total_' + id).textContent = formatMoney(qtd * vu);
+    recalcularTotais();
+}
+
+function removerPeca(id) {
+    const row = document.getElementById('peca-row-' + id);
+    if (row) row.remove();
+    recalcularTotais();
+}
+
+function recalcularTotais() {
+    let totalPecas = 0;
+    document.querySelectorAll('#corpo-pecas tr').forEach(function (row) {
+        const qtd = parseFloat(row.querySelector('[name="item_qtd"]').value || 0);
+        const vu = parseFloat(row.querySelector('[name="item_valor_unit"]').value || 0);
+        totalPecas += qtd * vu;
+    });
+    let totalServicos = 0;
+    document.querySelectorAll('[name="servico_valor"]').forEach(function (input) {
+        totalServicos += parseFloat(input.value || 0);
+    });
+    const desconto = parseFloat(document.getElementById('desconto').value || 0);
+    document.getElementById('valor_pecas').value = totalPecas.toFixed(2);
+    document.getElementById('total-pecas-label').textContent = formatMoney(totalPecas);
+    document.getElementById('total-servicos-label').textContent = formatMoney(totalServicos);
+    document.getElementById('total-os-label').textContent = formatMoney(totalServicos + totalPecas - desconto);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (servicosExistentes.length) {
+        servicosExistentes.forEach(function (s) { adicionarServico(s); });
+    } else {
+        adicionarServico();
+    }
+    pecasExistentes.forEach(function (p) { adicionarPeca(p.origem, p); });
+    recalcularTotais();
+});
+</script>
 {% endblock %}

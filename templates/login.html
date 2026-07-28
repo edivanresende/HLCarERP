@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - HL Car Auto Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #0a0a0a;
+        }
+
+        .background {
+            position: fixed;
+            inset: 0;
+            background: url("/static/img/fundo_login.png") center center / cover no-repeat;
+            filter: brightness(0.55) contrast(1.05);
+            z-index: 0;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(10,10,15,0.7) 100%);
+            z-index: 1;
+        }
+
+        .login-wrapper {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(15, 17, 23, 0.88);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 40px 36px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        .logo-box {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .logo-box img {
+            width: 88px;
+            height: 88px;
+            object-fit: contain;
+            border-radius: 16px;
+            background: #0f1115;
+            padding: 8px;
+            border: 1px solid rgba(249, 115, 22, 0.35);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+
+        h1 {
+            color: #ffffff;
+            font-size: 1.8rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            text-align: center;
+            font-size: 0.95rem;
+            margin-bottom: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #d1d5db;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 7px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper .left-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            font-size: 1rem;
+        }
+
+        .form-control {
+            width: 100%;
+            background: #0c0e12;
+            border: 1px solid #2a2f3a;
+            border-radius: 12px;
+            padding: 14px 16px 14px 44px;
+            color: #ffffff;
+            font-size: 0.97rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #f97316;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+        }
+
+        .form-control::placeholder {
+            color: #6b7280;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+
+        .toggle-password:hover {
+            color: #f97316;
+        }
+
+        .btn-entrar {
+            width: 100%;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 15px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-entrar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px -8px rgba(249, 115, 22, 0.55);
+        }
+
+        .alert-erro {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 12px 16px;
+            border-radius: 11px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .features {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .feature {
+            flex: 1;
+            min-width: 70px;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.78rem;
+        }
+
+        .feature i {
+            display: block;
+            font-size: 1.3rem;
+            color: #f97316;
+            margin-bottom: 6px;
+        }
+
+        .copyright {
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.8rem;
+            margin-top: 28px;
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 32px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background"></div>
+    <div class="overlay"></div>
+
+    <div class="login-wrapper">
+        <div>
+            <div class="login-card">
+                <div class="logo-box">
+                    <img src="/static/img/logo_hlcar.png" alt="HL Car Auto Center">
+                </div>
+
+                <h1>Login</h1>
+                <p class="subtitle">Acesse sua conta para continuar</p>
+
+                {% if erro %}
+                <div class="alert-erro">
+                    <i class="fas fa-exclamation-circle"></i> {{ erro }}
+                </div>
+                {% endif %}
+
+                <form method="POST" action="/login">
+                    <div class="form-group">
+                        <label>Usuário</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-user left-icon"></i>
+                            <input type="text" name="login" class="form-control" 
+                                   placeholder="Digite seu usuário" required autofocus
+                                   value="{{ request.form.login if request.form else '' }}">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Senha</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-lock left-icon"></i>
+                            <input type="password" name="senha" id="senha" class="form-control" 
+                                   placeholder="Digite sua senha" required>
+                            <button type="button" class="toggle-password" onclick="toggleSenha()">
+                                <i class="fas fa-eye" id="eyeIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-entrar">
+                        Entrar
+                    </button>
+                </form>
+            </div>
+
+            <div class="features">
+                <div class="feature">
+                    <i class="fas fa-shield-alt"></i>
+                    Segurança
+                </div>
+                <div class="feature">
+                    <i class="fas fa-wrench"></i>
+                    Qualidade
+                </div>
+                <div class="feature">
+                    <i class="fas fa-clock"></i>
+                    Agilidade
+                </div>
+                <div class="feature">
+                    <i class="fas fa-users"></i>
+                    Confiança
+                </div>
+            </div>
+
+            <div class="copyright">
+                © 2026 HLCar Auto Center — Todos os direitos reservados.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSenha() {
+            const input = document.getElementById('senha');
+            const icon = document.getElementById('eyeIcon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+    </script>
+</body>
+</html>

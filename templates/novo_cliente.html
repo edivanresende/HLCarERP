@@ -13,14 +13,18 @@ Novo Cliente
 <div class="container-fluid">
 
     <h2 class="mb-4 text-white">
-
         {% if cliente %}
             Editar Cliente
         {% else %}
             Novo Cliente
         {% endif %}
-
     </h2>
+
+    {% if request.args.get('aviso') == 'cpf_existente' or aviso == 'cpf_existente' %}
+    <div class="alert alert-warning">
+        Este CPF/CNPJ já está cadastrado. Atualize os dados se necessário.
+    </div>
+    {% endif %}
 
     <div class="card-dashboard">
 
@@ -29,124 +33,114 @@ Novo Cliente
             <div class="row">
 
                 <div class="col-md-6 mb-3">
-                    <label>Nome</label>
-
+                    <label class="text-secondary">Nome</label>
                     <input
                         type="text"
                         name="nome"
-                        class="form-control"
+                        class="form-control bg-dark text-white border-secondary"
                         required
                         value="{{ cliente.nome if cliente else '' }}"
                     >
-
                 </div>
 
                 <div class="col-md-3 mb-3">
-                    <label>CPF/CNPJ</label>
+                    <label class="text-secondary">Data de Nascimento</label>
+                    <input
+                        type="date"
+                        name="data_nascimento"
+                        class="form-control bg-dark text-white border-secondary"
+                        value="{{ cliente.data_nascimento.strftime('%Y-%m-%d') if cliente and cliente.data_nascimento else '' }}"
+                    >
+                </div>
 
+                <div class="col-md-3 mb-3">
+                    <label class="text-secondary">CPF/CNPJ</label>
                     <input
                         type="text"
                         name="cpf_cnpj"
-                        class="form-control"
+                        class="form-control bg-dark text-white border-secondary"
                         value="{{ cliente.cpf_cnpj if cliente else '' }}"
                     >
-
                 </div>
 
                 <div class="col-md-3 mb-3">
-                    <label>Telefone</label>
-
+                    <label class="text-secondary">Telefone</label>
                     <input
                         type="text"
                         name="telefone"
-                        class="form-control"
+                        class="form-control bg-dark text-white border-secondary"
                         value="{{ cliente.telefone if cliente else '' }}"
                     >
-
                 </div>
 
                 <div class="col-md-3 mb-3">
-                    <label>WhatsApp</label>
-
+                    <label class="text-secondary">WhatsApp</label>
                     <input
                         type="text"
                         name="whatsapp"
-                        class="form-control"
+                        class="form-control bg-dark text-white border-secondary"
                         value="{{ cliente.whatsapp if cliente else '' }}"
                     >
-
                 </div>
 
                 <div class="col-md-3 mb-3">
-                    <label>Email</label>
-
+                    <label class="text-secondary">Email</label>
                     <input
                         type="email"
                         name="email"
-                        class="form-control"
+                        class="form-control bg-dark text-white border-secondary"
                         value="{{ cliente.email if cliente else '' }}"
                     >
-
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label>Endereço</label>
-
-                    <input
-                        type="text"
-                        name="endereco"
-                        class="form-control"
-                        value="{{ cliente.endereco if cliente else '' }}"
-                    >
-
                 </div>
 
                 <div class="col-md-3 mb-3">
-                    <label>Cidade</label>
-
-                    <input
-                        type="text"
-                        name="cidade"
-                        class="form-control"
-                        value="{{ cliente.cidade if cliente else '' }}"
-                    >
-
-                </div>
-
-                <div class="col-md-3 mb-3">
-                    <label>Estado</label>
-
+                    <label class="text-secondary">Estado</label>
                     <input
                         type="text"
                         name="estado"
-                        class="form-control"
+                        class="form-control bg-dark text-white border-secondary"
+                        maxlength="2"
                         value="{{ cliente.estado if cliente else '' }}"
                     >
+                </div>
 
+                <div class="col-md-6 mb-3">
+                    <label class="text-secondary">Endereço</label>
+                    <input
+                        type="text"
+                        name="endereco"
+                        class="form-control bg-dark text-white border-secondary"
+                        value="{{ cliente.endereco if cliente else '' }}"
+                    >
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <label class="text-secondary">Cidade</label>
+                    <input
+                        type="text"
+                        name="cidade"
+                        class="form-control bg-dark text-white border-secondary"
+                        value="{{ cliente.cidade if cliente else '' }}"
+                    >
                 </div>
 
                 <div class="col-12 mb-3">
-
-                    <label>Observações</label>
-
+                    <label class="text-secondary">Observações</label>
                     <textarea
                         name="observacoes"
-                        class="form-control"
-                        rows="5"
+                        class="form-control bg-dark text-white border-secondary"
+                        rows="4"
                     >{{ cliente.observacoes if cliente else '' }}</textarea>
-
                 </div>
 
             </div>
 
-            <button class="btn btn-success">
-
+            <button type="submit" class="btn btn-success">
                 {% if cliente %}
                     Atualizar Cliente
                 {% else %}
                     Salvar Cliente
                 {% endif %}
-
             </button>
 
             <a href="/clientes" class="btn btn-secondary">

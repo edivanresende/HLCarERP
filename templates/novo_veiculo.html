@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}
-Novo Veículo
+{% if veiculo %}Editar Veículo{% else %}Novo Veículo{% endif %}
 {% endblock %}
 
 {% block conteudo %}
@@ -9,8 +9,14 @@ Novo Veículo
 <div class="container-fluid">
 
     <h2 class="mb-4 text-white">
-        Novo Veículo
+        {% if veiculo %}Editar Veículo{% else %}Novo Veículo{% endif %}
     </h2>
+
+    {% if aviso == 'placa_existente' %}
+    <div class="alert alert-warning">
+        Esta placa já está cadastrada. Atualize os dados se necessário.
+    </div>
+    {% endif %}
 
     <div class="card-dashboard">
 
@@ -19,8 +25,8 @@ Novo Veículo
             <div class="row">
 
                 <div class="col-md-6 mb-3">
-                    <label>Cliente</label>
-                    <select name="cliente_id" class="form-control" required>
+                    <label class="text-secondary">Cliente</label>
+                    <select name="cliente_id" class="form-control bg-dark text-white border-secondary" required>
                         <option value="">Selecione...</option>
                         {% for cliente in clientes %}
                         <option value="{{ cliente.id }}"
@@ -32,50 +38,64 @@ Novo Veículo
                 </div>
 
                 <div class="col-md-6 mb-3">
-                    <label>Placa</label>
-                    <input type="text" name="placa" class="form-control" required
+                    <label class="text-secondary">Placa</label>
+                    <input type="text" name="placa" class="form-control bg-dark text-white border-secondary" required
                            value="{{ veiculo.placa if veiculo else '' }}">
                 </div>
 
                 <div class="col-md-4 mb-3">
-                    <label>Marca</label>
-                    <input type="text" name="marca" class="form-control"
+                    <label class="text-secondary">Marca</label>
+                    <input type="text" name="marca" class="form-control bg-dark text-white border-secondary"
                            value="{{ veiculo.marca if veiculo else '' }}">
                 </div>
 
                 <div class="col-md-4 mb-3">
-                    <label>Modelo</label>
-                    <input type="text" name="modelo" class="form-control"
+                    <label class="text-secondary">Modelo</label>
+                    <input type="text" name="modelo" class="form-control bg-dark text-white border-secondary"
                            value="{{ veiculo.modelo if veiculo else '' }}">
                 </div>
 
                 <div class="col-md-4 mb-3">
-                    <label>Cor</label>
-                    <input type="text" name="cor" class="form-control"
+                    <label class="text-secondary">Cor</label>
+                    <input type="text" name="cor" class="form-control bg-dark text-white border-secondary"
                            value="{{ veiculo.cor if veiculo else '' }}">
                 </div>
 
                 <div class="col-md-4 mb-3">
-                    <label>KM</label>
-                    <input type="number" name="km" class="form-control"
+                    <label class="text-secondary">KM Atual</label>
+                    <input type="number" name="km" class="form-control bg-dark text-white border-secondary"
                            value="{{ veiculo.km if veiculo and veiculo.km else '' }}">
                 </div>
 
                 <div class="col-md-4 mb-3">
-                    <label>Chassi</label>
-                    <input type="text" name="chassi" class="form-control"
+                    <label class="text-secondary">Próxima Revisão (Data)</label>
+                    <input type="date" name="proxima_revisao_data"
+                           class="form-control bg-dark text-white border-secondary"
+                           value="{{ veiculo.proxima_revisao_data.strftime('%Y-%m-%d') if veiculo and veiculo.proxima_revisao_data else '' }}">
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="text-secondary">Próxima Revisão (KM)</label>
+                    <input type="number" name="proxima_revisao_km"
+                           class="form-control bg-dark text-white border-secondary"
+                           value="{{ veiculo.proxima_revisao_km if veiculo and veiculo.proxima_revisao_km else '' }}">
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="text-secondary">Chassi</label>
+                    <input type="text" name="chassi" class="form-control bg-dark text-white border-secondary"
                            value="{{ veiculo.chassi if veiculo else '' }}">
                 </div>
 
                 <div class="col-md-4 mb-3">
-                    <label>Motor</label>
-                    <input type="text" name="motor" class="form-control"
+                    <label class="text-secondary">Motor</label>
+                    <input type="text" name="motor" class="form-control bg-dark text-white border-secondary"
                            value="{{ veiculo.motor if veiculo else '' }}">
                 </div>
 
                 <div class="col-md-4 mb-3">
-                    <label>Combustível</label>
-                    <select name="combustivel" class="form-control">
+                    <label class="text-secondary">Combustível</label>
+                    <select name="combustivel" class="form-control bg-dark text-white border-secondary">
                         {% set comb = veiculo.combustivel if veiculo else 'Gasolina' %}
                         <option {% if comb == 'Gasolina' %}selected{% endif %}>Gasolina</option>
                         <option {% if comb == 'Etanol' %}selected{% endif %}>Etanol</option>
@@ -89,8 +109,8 @@ Novo Veículo
 
             </div>
 
-            <button class="btn btn-success">
-                Salvar Veículo
+            <button type="submit" class="btn btn-success">
+                {% if veiculo %}Atualizar Veículo{% else %}Salvar Veículo{% endif %}
             </button>
 
             <a href="/veiculos" class="btn btn-secondary">

@@ -12,6 +12,69 @@
 
 </div>
 
+<!-- ===== FILTRO DE DATA ===== -->
+<div class="card bg-dark shadow border-0 mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-3 align-items-end">
+
+            <div class="col-auto">
+                <label class="text-secondary small d-block mb-1">Período rápido</label>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('ordens', periodo='hoje') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'hoje' else 'btn-outline-secondary' }}">
+                        Hoje
+                    </a>
+                    <a href="{{ url_for('ordens', periodo='semana') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'semana' else 'btn-outline-secondary' }}">
+                        Esta Semana
+                    </a>
+                    <a href="{{ url_for('ordens', periodo='mes') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'mes' else 'btn-outline-secondary' }}">
+                        Este Mês
+                    </a>
+                    <a href="{{ url_for('ordens', periodo='ano') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'ano' else 'btn-outline-secondary' }}">
+                        Este Ano
+                    </a>
+                    <a href="{{ url_for('ordens') }}"
+                       class="btn btn-sm {{ 'btn-warning' if not periodo and not data_inicio else 'btn-outline-secondary' }}">
+                        Todos
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-2">
+                <label class="text-secondary small">De</label>
+                <input type="date" name="data_inicio" value="{{ data_inicio or '' }}"
+                       class="form-control form-control-sm bg-dark text-white border-secondary">
+            </div>
+
+            <div class="col-md-2">
+                <label class="text-secondary small">Até</label>
+                <input type="date" name="data_fim" value="{{ data_fim or '' }}"
+                       class="form-control form-control-sm bg-dark text-white border-secondary">
+            </div>
+
+            <div class="col-md-2">
+                <label class="text-secondary small">Status</label>
+                <select name="status" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    <option value="ABERTA" {{ 'selected' if status == 'ABERTA' else '' }}>Aberta</option>
+                    <option value="FINALIZADA" {{ 'selected' if status == 'FINALIZADA' else '' }}>Finalizada</option>
+                </select>
+            </div>
+
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="fa fa-filter"></i> Filtrar
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+<!-- ===== FIM DO FILTRO ===== -->
+
 <div class="card bg-dark shadow border-0">
 
     <div class="card-body">
@@ -56,10 +119,9 @@
                         {{ ordem.veiculo.marca }}
                         {{ ordem.veiculo.modelo }}
                     </td>
-                                        <td>
 
+                    <td>
                         {{ ordem.km }}
-
                     </td>
 
                     <td>
@@ -67,17 +129,13 @@
                         {% if ordem.status == "FINALIZADA" %}
 
                             <span class="badge bg-success">
-
                                 FINALIZADA
-
                             </span>
 
                         {% else %}
 
                             <span class="badge bg-warning text-dark">
-
                                 ABERTA
-
                             </span>
 
                         {% endif %}
@@ -85,9 +143,7 @@
                     </td>
 
                     <td>
-
                         R$ {{ "%.2f"|format(ordem.valor_total) }}
-
                     </td>
 
                     <td>
@@ -95,25 +151,20 @@
                         <a href="/ordens/pdf/{{ ordem.id }}"
                            target="_blank"
                            class="btn btn-danger btn-sm">
-
                             PDF
-
                         </a>
 
                         <a href="/ordens/editar/{{ ordem.id }}"
                            class="btn btn-primary btn-sm">
-
                             Editar
-
                         </a>
-                                                {% if ordem.status != "FINALIZADA" %}
+
+                        {% if ordem.status != "FINALIZADA" %}
 
                         <a href="/ordens/finalizar/{{ ordem.id }}"
                            class="btn btn-success btn-sm"
                            onclick="return confirm('Deseja finalizar esta Ordem de Serviço?')">
-
                             Finalizar
-
                         </a>
 
                         {% endif %}
@@ -121,15 +172,20 @@
                         <a href="/ordens/excluir/{{ ordem.id }}"
                            class="btn btn-secondary btn-sm"
                            onclick="return confirm('Deseja realmente excluir esta Ordem de Serviço?')">
-
                             Excluir
-
                         </a>
 
                     </td>
 
                 </tr>
-                                {% endfor %}
+
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-secondary py-4">
+                        Nenhuma ordem encontrada neste período
+                    </td>
+                </tr>
+                {% endfor %}
 
             </tbody>
 
@@ -138,4 +194,5 @@
     </div>
 
 </div>
+
 {% endblock %}

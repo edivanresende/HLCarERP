@@ -1,12 +1,171 @@
 {% extends "base.html" %}
+
 {% block title %}Configurações{% endblock %}
+
 {% block conteudo %}
 <div class="container-fluid">
+
     <h2 class="text-white mb-4"><i class="fa fa-cog"></i> Configurações</h2>
-    <div class="card-dashboard">
-        <p class="text-secondary mb-2"><strong>Empresa:</strong> HL Car Auto Center</p>
-        <p class="text-secondary mb-2"><strong>Sistema:</strong> HLCarERP</p>
-        <p class="text-secondary mb-0"><strong>Modo offline:</strong> Ativo</p>
+
+    {% if mensagem %}
+    <div class="alert alert-success">{{ mensagem }}</div>
+    {% endif %}
+    {% if erro %}
+    <div class="alert alert-danger">{{ erro }}</div>
+    {% endif %}
+
+    <div class="row g-4">
+
+        <!-- ===================== DADOS DA EMPRESA ===================== -->
+        <div class="col-lg-8">
+            <div class="card bg-dark border-0 shadow">
+                <div class="card-header bg-transparent border-secondary">
+                    <h5 class="text-white mb-0"><i class="fa fa-building"></i> Dados da Empresa</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="acao" value="empresa">
+
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label text-secondary">Razão Social</label>
+                                <input type="text" name="razao_social" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.razao_social if empresa else 'HL CAR AUTO CENTER EDIVAN DE SOUZA RESENDE LTDA' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">CNPJ</label>
+                                <input type="text" name="cnpj" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.cnpj if empresa else '61.752.233/0001-04' }}">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary">Nome Fantasia</label>
+                                <input type="text" name="nome_fantasia" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.nome_fantasia if empresa else 'HL CAR AUTO CENTER' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary">Inscrição Estadual</label>
+                                <input type="text" name="inscricao_estadual" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.inscricao_estadual if empresa else '' }}">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">Telefone</label>
+                                <input type="text" name="telefone" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.telefone if empresa else '(94) 9863-3585' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">WhatsApp</label>
+                                <input type="text" name="whatsapp" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.whatsapp if empresa else '(94) 9863-3585' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">E-mail</label>
+                                <input type="email" name="email" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.email if empresa else 'EDIVAN.RESENDE1@GMAIL.COM' }}">
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label text-secondary">Site</label>
+                                <input type="text" name="site" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.site if empresa else '' }}">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary">CEP</label>
+                                <input type="text" name="cep" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.cep if empresa else '68.515-000' }}">
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label text-secondary">Endereço</label>
+                                <input type="text" name="endereco" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.endereco if empresa else 'AV SONIA CORTES' }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-secondary">Número</label>
+                                <input type="text" name="numero" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.numero if empresa else 'S/N' }}">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">Complemento</label>
+                                <input type="text" name="complemento" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.complemento if empresa else 'QUADRA 1 LOTE 19' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">Bairro</label>
+                                <input type="text" name="bairro" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.bairro if empresa else 'BEIRA RIO' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary">Cidade</label>
+                                <input type="text" name="cidade" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.cidade if empresa else 'PARAUAPEBAS' }}">
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label text-secondary">UF</label>
+                                <input type="text" name="estado" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.estado if empresa else 'PA' }}" maxlength="2">
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fa fa-save"></i> Salvar Dados da Empresa
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================== ALTERAR SENHA + SISTEMA ===================== -->
+        <div class="col-lg-4">
+
+            <!-- Alterar Senha -->
+            <div class="card bg-dark border-0 shadow mb-4">
+                <div class="card-header bg-transparent border-secondary">
+                    <h5 class="text-white mb-0"><i class="fa fa-key"></i> Alterar Senha</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="acao" value="senha">
+
+                        <div class="mb-3">
+                            <label class="form-label text-secondary">Senha Atual</label>
+                            <input type="password" name="senha_atual" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-secondary">Nova Senha</label>
+                            <input type="password" name="nova_senha" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-secondary">Confirmar Nova Senha</label>
+                            <input type="password" name="confirma_senha" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-outline-warning w-100">
+                            <i class="fa fa-lock"></i> Alterar Senha
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Informações do Sistema -->
+            <div class="card bg-dark border-0 shadow">
+                <div class="card-header bg-transparent border-secondary">
+                    <h5 class="text-white mb-0"><i class="fa fa-info-circle"></i> Sistema</h5>
+                </div>
+                <div class="card-body text-secondary">
+                    <p class="mb-2"><strong>Empresa:</strong> {{ empresa.nome_fantasia if empresa else 'HL Car Auto Center' }}</p>
+                    <p class="mb-2"><strong>Sistema:</strong> HLCarERP</p>
+                    <p class="mb-2"><strong>Usuário logado:</strong> {{ usuario.nome if usuario else '-' }}</p>
+                    <p class="mb-2"><strong>Perfil:</strong> {{ usuario.perfil if usuario else '-' }}</p>
+                    <p class="mb-0"><strong>Modo offline:</strong> Ativo</p>
+                </div>
+            </div>
+
+        </div>
     </div>
 </div>
 {% endblock %}

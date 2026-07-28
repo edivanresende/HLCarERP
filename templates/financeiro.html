@@ -3,6 +3,45 @@
 {% block conteudo %}
 <div class="container-fluid">
     <h2 class="text-white mb-4"><i class="fa fa-dollar-sign"></i> Financeiro</h2>
+
+    <!-- ===== FILTRO DE DATA ===== -->
+    <div class="card-dashboard mb-4 p-3">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-auto">
+                <label class="text-secondary small d-block mb-1">Período rápido</label>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('financeiro', periodo='hoje') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'hoje' else 'btn-outline-secondary' }}">Hoje</a>
+                    <a href="{{ url_for('financeiro', periodo='semana') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'semana' else 'btn-outline-secondary' }}">Esta Semana</a>
+                    <a href="{{ url_for('financeiro', periodo='mes') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'mes' else 'btn-outline-secondary' }}">Este Mês</a>
+                    <a href="{{ url_for('financeiro', periodo='ano') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'ano' else 'btn-outline-secondary' }}">Este Ano</a>
+                    <a href="{{ url_for('financeiro') }}"
+                       class="btn btn-sm {{ 'btn-warning' if not periodo and not data_inicio else 'btn-outline-secondary' }}">Todos</a>
+                </div>
+            </div>
+
+            <div class="col-md-2">
+                <label class="text-secondary small">De</label>
+                <input type="date" name="data_inicio" value="{{ data_inicio or '' }}"
+                       class="form-control form-control-sm bg-dark text-white border-secondary">
+            </div>
+            <div class="col-md-2">
+                <label class="text-secondary small">Até</label>
+                <input type="date" name="data_fim" value="{{ data_fim or '' }}"
+                       class="form-control form-control-sm bg-dark text-white border-secondary">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="fa fa-filter"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+    <!-- ===== FIM DO FILTRO ===== -->
+
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="card-dashboard">

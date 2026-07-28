@@ -1,25 +1,40 @@
 {% extends "base.html" %}
 
-{% block title %}
-Dashboard
-{% endblock %}
+{% block title %}Dashboard{% endblock %}
 
 {% block conteudo %}
-
 <div class="container-fluid">
 
     <div class="row mb-4">
         <div class="col">
             <h2 class="text-white">Dashboard</h2>
-            <p class="text-secondary">
-                Bem-vindo ao <strong>HLCarERP</strong> - Sistema de Gestão da Oficina
-            </p>
+            <p class="text-secondary">Bem-vindo ao <strong>HLCarERP</strong> - Sistema de Gestão da Oficina</p>
         </div>
+    </div>
+
+    <!-- FILTRO -->
+    <div class="card-dashboard mb-4 p-3">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-auto">
+                <label class="text-secondary small d-block mb-1">Período</label>
+                <div class="btn-group">
+                    <a href="{{ url_for('dashboard', periodo='hoje') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'hoje' else 'btn-outline-secondary' }}">Hoje</a>
+                    <a href="{{ url_for('dashboard', periodo='semana') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'semana' else 'btn-outline-secondary' }}">Esta Semana</a>
+                    <a href="{{ url_for('dashboard', periodo='mes') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'mes' else 'btn-outline-secondary' }}">Este Mês</a>
+                    <a href="{{ url_for('dashboard', periodo='ano') }}"
+                       class="btn btn-sm {{ 'btn-warning' if periodo == 'ano' else 'btn-outline-secondary' }}">Este Ano</a>
+                    <a href="{{ url_for('dashboard') }}"
+                       class="btn btn-sm {{ 'btn-warning' if not periodo else 'btn-outline-secondary' }}">Todos</a>
+                </div>
+            </div>
+        </form>
     </div>
 
     <!-- CARDS PRINCIPAIS -->
     <div class="row g-4">
-
         <div class="col-xl-3 col-md-6">
             <div class="card-dashboard shadow">
                 <div class="d-flex justify-content-between align-items-center">
@@ -27,13 +42,10 @@ Dashboard
                         <small class="text-secondary">Clientes</small>
                         <h2 class="mt-2 fw-bold">{{ total_clientes }}</h2>
                     </div>
-                    <div style="font-size:45px;color:#4f8cff">
-                        <i class="fa fa-users"></i>
-                    </div>
+                    <div style="font-size:45px;color:#4f8cff"><i class="fa fa-users"></i></div>
                 </div>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
             <div class="card-dashboard shadow">
                 <div class="d-flex justify-content-between align-items-center">
@@ -41,13 +53,10 @@ Dashboard
                         <small class="text-secondary">Veículos</small>
                         <h2 class="mt-2 fw-bold">{{ total_veiculos }}</h2>
                     </div>
-                    <div style="font-size:45px;color:#16a34a">
-                        <i class="fa fa-car"></i>
-                    </div>
+                    <div style="font-size:45px;color:#16a34a"><i class="fa fa-car"></i></div>
                 </div>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
             <div class="card-dashboard shadow">
                 <div class="d-flex justify-content-between align-items-center">
@@ -55,62 +64,38 @@ Dashboard
                         <small class="text-secondary">Ordens de Serviço</small>
                         <h2 class="mt-2 fw-bold">{{ total_os }}</h2>
                     </div>
-                    <div style="font-size:45px;color:#f59e0b">
-                        <i class="fa fa-file-alt"></i>
-                    </div>
+                    <div style="font-size:45px;color:#f59e0b"><i class="fa fa-file-alt"></i></div>
                 </div>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
             <div class="card-dashboard shadow">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <small class="text-secondary">Faturamento</small>
                         <h3 class="mt-2 fw-bold">
-                            R$ {{ "{:,.2f}".format(faturamento).replace(",", "X").replace(".", ",").replace("X",".") }}
+                            R$ {{ "{:,.2f}".format(faturamento).replace(",", "X").replace(".", ",").replace("X", ".") }}
                         </h3>
                     </div>
-                    <div style="font-size:45px;color:#22c55e">
-                        <i class="fa fa-dollar-sign"></i>
-                    </div>
+                    <div style="font-size:45px;color:#22c55e"><i class="fa fa-dollar-sign"></i></div>
                 </div>
             </div>
         </div>
-
     </div>
 
     <!-- GRÁFICO + AGENDA -->
     <div class="row mt-5">
-
         <div class="col-lg-8">
             <div class="card-dashboard shadow">
-                <h4 class="mb-4">
-                    <i class="fa fa-chart-line"></i>
-                    Movimento da Oficina
-                </h4>
-                <div style="height:350px;display:flex;align-items:center;justify-content:center;flex-direction:column">
-                    <i class="fa fa-chart-area mb-3" style="font-size:70px;color:#3b82f6;"></i>
-                    <h5 class="text-secondary">Em breve este gráfico exibirá:</h5>
-                    <ul class="text-secondary mt-3" style="line-height:35px;font-size:18px">
-                        <li>Faturamento diário</li>
-                        <li>Ordens de serviço por mês</li>
-                        <li>Serviços mais vendidos</li>
-                        <li>Comparativo mensal</li>
-                        <li>Meta x Realizado</li>
-                    </ul>
-                </div>
+                <h4 class="mb-4"><i class="fa fa-chart-line"></i> Movimento da Oficina (últimos 7 dias)</h4>
+                <canvas id="graficoMovimento" height="120"></canvas>
             </div>
         </div>
 
-        <!-- AGENDA DO BANCO -->
         <div class="col-lg-4">
             <div class="card-dashboard shadow">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h4 class="mb-0">
-                        <i class="fa fa-calendar-check"></i>
-                        Agenda do Dia
-                    </h4>
+                    <h4 class="mb-0"><i class="fa fa-calendar-check"></i> Agenda do Dia</h4>
                     <button class="btn btn-sm btn-warning" onclick="abrirFormAgendamento()" title="Novo agendamento">
                         <i class="fa fa-plus"></i>
                     </button>
@@ -142,7 +127,6 @@ Dashboard
                     </div>
                 </div>
 
-                <!-- Formulário manual -->
                 <div id="form-agendamento" class="mb-3 p-2 rounded" style="background:#0f172a;display:none;">
                     <div class="row g-2">
                         <div class="col-6">
@@ -165,13 +149,11 @@ Dashboard
                 </div>
 
                 <div id="horarios-livres" class="mb-3 small"></div>
-
                 <div id="agenda-lista" style="max-height:280px;overflow-y:auto;">
                     <p class="text-secondary text-center py-3 mb-0">Selecione um mecânico</p>
                 </div>
             </div>
         </div>
-
     </div>
 
     <!-- CARDS INFERIORES -->
@@ -181,7 +163,7 @@ Dashboard
                 <h5><i class="fa fa-tools"></i> Oficina</h5>
                 <hr>
                 <p class="mb-2">🔧 Ordens em andamento</p>
-                <h3>0</h3>
+                <h3>{{ ordens_andamento }}</h3>
             </div>
         </div>
         <div class="col-lg-4">
@@ -189,7 +171,14 @@ Dashboard
                 <h5><i class="fa fa-boxes"></i> Estoque</h5>
                 <hr>
                 <p class="mb-2">📦 Produtos com estoque baixo</p>
-                <h3>0</h3>
+                <h3>{{ produtos_baixo|length }}</h3>
+                {% if produtos_baixo %}
+                <ul class="list-unstyled small mt-2 mb-0">
+                    {% for p in produtos_baixo %}
+                    <li class="text-warning">{{ p.descricao }} ({{ p.estoque_atual }})</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
             </div>
         </div>
         <div class="col-lg-4">
@@ -197,7 +186,7 @@ Dashboard
                 <h5><i class="fa fa-money-bill-wave"></i> Financeiro</h5>
                 <hr>
                 <p class="mb-2">💰 Contas a Receber</p>
-                <h3>R$ 0,00</h3>
+                <h3>R$ {{ "{:,.2f}".format(contas_receber).replace(",", "X").replace(".", ",").replace("X", ".") }}</h3>
             </div>
         </div>
     </div>
@@ -207,27 +196,121 @@ Dashboard
             <div class="card-dashboard shadow">
                 <h5><i class="fa fa-clock"></i> Últimas Ordens de Serviço</h5>
                 <hr>
-                <div class="text-secondary text-center py-5">
-                    <i class="fa fa-file-alt mb-3" style="font-size:50px;"></i>
-                    <p>Nenhuma Ordem de Serviço cadastrada.</p>
+                {% if ultimas_ordens %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Nº</th>
+                                <th>Status</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in ultimas_ordens %}
+                            <tr>
+                                <td>
+                                    <a href="/ordens" class="text-warning text-decoration-none">
+                                        #{{ o.numero or o.id }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if o.status == 'FINALIZADA' %}
+                                    <span class="badge bg-success">{{ o.status }}</span>
+                                    {% elif o.status == 'ABERTA' %}
+                                    <span class="badge bg-warning text-dark">{{ o.status }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ o.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>R$ {{ "%.2f"|format(o.valor_total or 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
+                {% else %}
+                <div class="text-secondary text-center py-4">
+                    <i class="fa fa-file-alt mb-2" style="font-size:40px;"></i>
+                    <p class="mb-0">Nenhuma Ordem de Serviço cadastrada.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
+
         <div class="col-lg-6">
             <div class="card-dashboard shadow">
                 <h5><i class="fa fa-car-side"></i> Veículos em Atendimento</h5>
                 <hr>
-                <div class="text-secondary text-center py-5">
-                    <i class="fa fa-car mb-3" style="font-size:50px;"></i>
-                    <p>Nenhum veículo em atendimento.</p>
+                {% if veiculos_atendimento %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Placa</th>
+                                <th>Cliente</th>
+                                <th>OS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ordem, veiculo, cliente in veiculos_atendimento %}
+                            <tr>
+                                <td class="text-warning">{{ veiculo.placa }}</td>
+                                <td>{{ cliente.nome }}</td>
+                                <td>#{{ ordem.numero or ordem.id }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
+                {% else %}
+                <div class="text-secondary text-center py-4">
+                    <i class="fa fa-car mb-2" style="font-size:40px;"></i>
+                    <p class="mb-0">Nenhum veículo em atendimento.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
+// ===== GRÁFICO =====
+(function () {
+    const labels = {{ labels_grafico|tojson }};
+    const valores = {{ valores_grafico|tojson }};
+    const ctx = document.getElementById('graficoMovimento');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Faturamento (R$)',
+                    data: valores,
+                    backgroundColor: 'rgba(255, 107, 0, 0.7)',
+                    borderColor: '#ff6b00',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#d1d5db' } }
+                },
+                scales: {
+                    x: { ticks: { color: '#9ca3af' }, grid: { color: '#1f2937' } },
+                    y: { ticks: { color: '#9ca3af' }, grid: { color: '#1f2937' } }
+                }
+            }
+        });
+    }
+})();
+
+// ===== AGENDA (mesmo JS de antes) =====
 let agendaAtual = [];
 
 function minutosParaHora(min) {
@@ -235,12 +318,10 @@ function minutosParaHora(min) {
     const m = min % 60;
     return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
-
 function horaParaMinutos(horaStr) {
     const p = (horaStr || '00:00').split(':');
     return parseInt(p[0]) * 60 + parseInt(p[1] || 0);
 }
-
 function getConfigMecanico() {
     const sel = document.getElementById('select-mecanico');
     if (!sel.value) return null;
@@ -252,29 +333,22 @@ function getConfigMecanico() {
         almocoFim: parseInt(opt.getAttribute('data-almoco-fim') || 14) * 60
     };
 }
-
 function trocarMecanico() {
     document.getElementById('dia-fechado').checked = false;
     fecharFormAgendamento();
     montarAgenda();
 }
-
 function abrirFormAgendamento() {
     const sel = document.getElementById('select-mecanico');
-    if (!sel.value) {
-        alert('Selecione um mecânico primeiro.');
-        return;
-    }
+    if (!sel.value) { alert('Selecione um mecânico primeiro.'); return; }
     document.getElementById('form-agendamento').style.display = 'block';
     document.getElementById('ag-inicio').value = calcularProximoInicio();
     document.getElementById('ag-duracao').value = 40;
     document.getElementById('ag-descricao').value = '';
 }
-
 function fecharFormAgendamento() {
     document.getElementById('form-agendamento').style.display = 'none';
 }
-
 function calcularProximoInicio() {
     const cfg = getConfigMecanico();
     if (!cfg) return '09:00';
@@ -287,7 +361,6 @@ function calcularProximoInicio() {
     if (proximo >= cfg.saida) proximo = cfg.entrada;
     return minutosParaHora(proximo);
 }
-
 function calcularHorariosLivres() {
     const cfg = getConfigMecanico();
     if (!cfg) return [];
@@ -296,13 +369,11 @@ function calcularHorariosLivres() {
     });
     const livres = [];
     let cursor = cfg.entrada;
-
     function pulaAlmoco(pos) {
         if (pos >= cfg.almocoInicio && pos < cfg.almocoFim) return cfg.almocoFim;
         return pos;
     }
     cursor = pulaAlmoco(cursor);
-
     lista.forEach(function (a) {
         const ini = horaParaMinutos(a.hora_inicio);
         const fim = ini + parseInt(a.duracao_min || 40);
@@ -320,7 +391,6 @@ function calcularHorariosLivres() {
         cursor = Math.max(cursor, fim);
         cursor = pulaAlmoco(cursor);
     });
-
     if (cursor < cfg.saida) {
         if (cursor < cfg.almocoInicio) {
             if (cfg.almocoInicio - cursor >= 10)
@@ -333,27 +403,22 @@ function calcularHorariosLivres() {
     }
     return livres;
 }
-
 function montarAgenda() {
     const sel = document.getElementById('select-mecanico');
     const box = document.getElementById('agenda-lista');
     const livresBox = document.getElementById('horarios-livres');
-
     if (!sel.value) {
         box.innerHTML = '<p class="text-secondary text-center py-3 mb-0">Selecione um mecânico</p>';
         livresBox.innerHTML = '';
         agendaAtual = [];
         return;
     }
-
     if (document.getElementById('dia-fechado').checked) {
         box.innerHTML = '<p class="text-warning text-center py-4 mb-0"><i class="fa fa-lock"></i> Dia fechado para serviço longo</p>';
         livresBox.innerHTML = '';
         return;
     }
-
     box.innerHTML = '<p class="text-secondary text-center py-3">Carregando...</p>';
-
     fetch('/api/agenda?mecanico_id=' + sel.value)
         .then(function (r) { return r.json(); })
         .then(function (lista) {
@@ -362,15 +427,13 @@ function montarAgenda() {
         })
         .catch(function () {
             agendaAtual = [];
-            box.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar agenda. Confira se as rotas /api/agenda estão no app.py</p>';
+            box.innerHTML = '<p class="text-danger text-center py-3">Erro ao carregar agenda</p>';
         });
 }
-
 function renderAgenda() {
     const cfg = getConfigMecanico();
     const box = document.getElementById('agenda-lista');
     const livresBox = document.getElementById('horarios-livres');
-
     const livres = calcularHorariosLivres();
     if (livres.length > 0) {
         let txt = '<div class="text-success mb-1"><i class="fa fa-clock"></i> <strong>Horários livres:</strong></div>';
@@ -384,19 +447,15 @@ function renderAgenda() {
     } else {
         livresBox.innerHTML = '<div class="text-warning small mb-2"><i class="fa fa-exclamation-circle"></i> Sem horários livres</div>';
     }
-
     let html = '<div class="small text-secondary mb-2">Expediente: ' +
         minutosParaHora(cfg.entrada) + ' – ' + minutosParaHora(cfg.saida) +
         ' | Almoço: ' + minutosParaHora(cfg.almocoInicio) + ' – ' + minutosParaHora(cfg.almocoFim) + '</div>';
-
     if (agendaAtual.length === 0) {
         html += '<p class="text-success text-center py-3 mb-0">Nenhum agendamento — dia livre</p>';
         box.innerHTML = html;
         return;
     }
-
     html += '<table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>Horário</th><th>Serviço</th><th></th></tr></thead><tbody>';
-
     agendaAtual.forEach(function (a) {
         const dur = a.duracao_min || 40;
         const fim = a.hora_fim || minutosParaHora(horaParaMinutos(a.hora_inicio) + dur);
@@ -406,59 +465,40 @@ function renderAgenda() {
             '<td class="text-warning">' + (a.descricao || '') +
             (a.ordem_servico_id ? ' <small class="text-secondary">(OS)</small>' : '') + '</td>' +
             '<td class="text-nowrap">' +
-            '<button class="btn btn-sm btn-outline-warning me-1" onclick="alterarDuracao(' + a.id + ',' + dur + ')" title="Alterar duração"><i class="fa fa-clock"></i></button>' +
-            '<button class="btn btn-sm btn-outline-danger" onclick="excluirAgendamento(' + a.id + ')" title="Remover"><i class="fa fa-times"></i></button>' +
+            '<button class="btn btn-sm btn-outline-warning me-1" onclick="alterarDuracao(' + a.id + ',' + dur + ')"><i class="fa fa-clock"></i></button>' +
+            '<button class="btn btn-sm btn-outline-danger" onclick="excluirAgendamento(' + a.id + ')"><i class="fa fa-times"></i></button>' +
             '</td></tr>';
     });
-
     html += '</tbody></table>';
     box.innerHTML = html;
 }
-
 function usarHorarioLivre(inicio) {
     abrirFormAgendamento();
     document.getElementById('ag-inicio').value = inicio;
 }
-
 function alterarDuracao(id, atual) {
     const novo = prompt('Nova duração em minutos:', atual);
     if (!novo) return;
     const dur = parseInt(novo);
-    if (isNaN(dur) || dur < 5) {
-        alert('Duração inválida (mínimo 5 min).');
-        return;
-    }
+    if (isNaN(dur) || dur < 5) { alert('Duração inválida.'); return; }
     fetch('/api/agenda/atualizar/' + id, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ duracao_min: dur })
     }).then(function () { montarAgenda(); });
 }
-
 function excluirAgendamento(id) {
     if (!confirm('Remover este agendamento?')) return;
-    fetch('/api/agenda/excluir/' + id, { method: 'POST' })
-        .then(function () { montarAgenda(); });
+    fetch('/api/agenda/excluir/' + id, { method: 'POST' }).then(function () { montarAgenda(); });
 }
-
 function salvarAgendamentoManual() {
     const sel = document.getElementById('select-mecanico');
     if (!sel.value) return;
-
     const inicio = document.getElementById('ag-inicio').value;
     const duracao = parseInt(document.getElementById('ag-duracao').value || 0);
     const descricao = (document.getElementById('ag-descricao').value || '').trim();
-
-    if (!inicio || duracao < 5) {
-        alert('Informe horário e duração (mín. 5 min).');
-        return;
-    }
-    if (!descricao) {
-        alert('Informe o serviço / placa / cliente.');
-        return;
-    }
-
-    // conflito simples no cliente
+    if (!inicio || duracao < 5) { alert('Informe horário e duração.'); return; }
+    if (!descricao) { alert('Informe o serviço / placa / cliente.'); return; }
     const iniMin = horaParaMinutos(inicio);
     const fimMin = iniMin + duracao;
     for (let i = 0; i < agendaAtual.length; i++) {
@@ -466,11 +506,10 @@ function salvarAgendamentoManual() {
         const aIni = horaParaMinutos(a.hora_inicio);
         const aFim = aIni + parseInt(a.duracao_min || 40);
         if (iniMin < aFim && fimMin > aIni) {
-            alert('Horário indisponível! Conflito com: ' + a.hora_inicio + ' – ' + (a.descricao || ''));
+            alert('Horário indisponível! Conflito com: ' + a.hora_inicio);
             return;
         }
     }
-
     fetch('/api/agenda/criar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -483,18 +522,12 @@ function salvarAgendamentoManual() {
     })
     .then(function (r) { return r.json(); })
     .then(function (res) {
-        if (res.erro) {
-            alert(res.erro);
-            return;
-        }
+        if (res.erro) { alert(res.erro); return; }
         fecharFormAgendamento();
         montarAgenda();
     })
-    .catch(function () {
-        alert('Erro ao salvar. Confira a rota /api/agenda/criar no app.py');
-    });
+    .catch(function () { alert('Erro ao salvar.'); });
 }
-
 document.addEventListener('DOMContentLoaded', function () {
     const sel = document.getElementById('select-mecanico');
     if (sel && sel.options.length > 1) {
@@ -503,5 +536,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-
 {% endblock %}

@@ -83,6 +83,7 @@ class Cliente(db.Model):
     cidade = db.Column(db.String(100))
     estado = db.Column(db.String(2))
     observacoes = db.Column(db.Text)
+    data_nascimento = db.Column(db.Date, nullable=True)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     alterado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -118,6 +119,9 @@ class Veiculo(db.Model):
     chassi = db.Column(db.String(40))
     renavam = db.Column(db.String(20))
     km_atual = db.Column(db.Integer, default=0)
+    km = db.Column(db.Integer)
+    proxima_revisao_data = db.Column(db.Date, nullable=True)
+    proxima_revisao_km = db.Column(db.Integer, nullable=True)
     observacoes = db.Column(db.Text)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -593,15 +597,12 @@ class Mecanico(db.Model):
     whatsapp = db.Column(db.String(20))
     ativo = db.Column(db.Boolean, default=True)
 
-    # salario | comissao | salario_comissao
     forma_pagamento = db.Column(db.String(30), default="comissao")
-
     salario = db.Column(db.Float, default=0)
     percentual_comissao = db.Column(db.Float, default=20)
 
     hora_entrada = db.Column(db.Integer, default=9)
     hora_saida = db.Column(db.Integer, default=18)
-
     almoco_inicio = db.Column(db.Integer, default=12)
     almoco_fim = db.Column(db.Integer, default=14)
 
@@ -610,7 +611,7 @@ class Mecanico(db.Model):
 
 
 # ==========================================================
-# VÍNCULO OS x MECÂNICO (tempo + comissão por mecânico)
+# VÍNCULO OS x MECÂNICO
 # ==========================================================
 
 class OrdemServicoMecanico(db.Model):
@@ -620,10 +621,9 @@ class OrdemServicoMecanico(db.Model):
     ordem_servico_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"), nullable=False)
     mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"), nullable=False)
 
-    # Tempo estimado na abertura da OS (pode mudar depois na agenda)
-    duracao_estimada_min = db.Column(db.Integer, default=40)
+    descricao_servico = db.Column(db.String(250))  # ← NOVO
 
-    # Valores para comissão
+    duracao_estimada_min = db.Column(db.Integer, default=40)
     valor_mercado = db.Column(db.Float, default=0)
     valor_negociado = db.Column(db.Float, default=0)
     percentual_comissao = db.Column(db.Float, default=20)
@@ -635,7 +635,7 @@ class OrdemServicoMecanico(db.Model):
 
 
 # ==========================================================
-# AGENDAMENTO (agenda real — editável)
+# AGENDAMENTO
 # ==========================================================
 
 class Agendamento(db.Model):
@@ -646,16 +646,14 @@ class Agendamento(db.Model):
     ordem_servico_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"))
 
     data = db.Column(db.Date, nullable=False)
-    hora_inicio = db.Column(db.String(5), nullable=False)   # "09:00"
+    hora_inicio = db.Column(db.String(5), nullable=False)
 
-    # Estimado na criação / Real quando você ajusta na agenda
     duracao_estimada_min = db.Column(db.Integer, default=40)
-    duracao_real_min = db.Column(db.Integer)                 # se None, usa a estimada
-    hora_fim = db.Column(db.String(5))                       # recalculada ao alterar duração
+    duracao_real_min = db.Column(db.Integer)
+    hora_fim = db.Column(db.String(5))
 
     descricao = db.Column(db.String(250))
     status = db.Column(db.String(20), default="AGENDADO")
-    # AGENDADO | EM_EXECUCAO | CONCLUIDO | CANCELADO
 
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     alterado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
