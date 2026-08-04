@@ -18,7 +18,14 @@ Estoque
                 Gerenciamento completo de produtos, fornecedores e movimentações.
             </small>
         </div>
-        <div>
+        <div class="d-flex gap-2">
+            <a href="/estoque/entrada-rapida" class="btn btn-success">
+                <i class="fa fa-barcode"></i>
+                Entrada Rápida (Bipe)
+            </a>
+            <a href="/venda-rapida" class="btn btn-warning">
+                💰 Venda Rápida
+            </a>
             <a href="/produtos/novo" class="btn btn-warning">
                 <i class="fa fa-plus"></i>
                 Novo Produto
@@ -145,6 +152,11 @@ Estoque
     <!-- MENU RÁPIDO -->
     <div class="row g-3 mb-4">
         <div class="col-lg-2 d-grid">
+            <a href="/estoque/entrada-rapida" class="btn btn-success">
+                <i class="fa fa-barcode"></i> Entrada Rápida
+            </a>
+        </div>
+        <div class="col-lg-2 d-grid">
             <a href="/categorias" class="btn btn-outline-warning">
                 <i class="fa fa-tags"></i> Categorias
             </a>
@@ -162,11 +174,6 @@ Estoque
         <div class="col-lg-2 d-grid">
             <a href="/compras" class="btn btn-outline-info">
                 <i class="fa fa-cart-shopping"></i> Compras
-            </a>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/inventario" class="btn btn-outline-danger">
-                <i class="fa fa-clipboard-check"></i> Inventário
             </a>
         </div>
         <div class="col-lg-2 d-grid">

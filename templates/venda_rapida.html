@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+
+{% block title %}Venda Rápida de Peças{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white mb-0">Venda Rápida de Peças</h2>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modalConsulta">
+                🔍 Consultar Estoque
+            </button>
+            <a href="/vendas-rapidas" class="btn btn-outline-light">Ver Vendas</a>
+        </div>
+    </div>
+
+    {% if request.args.get('sucesso') %}
+    <div class="alert alert-success">Venda registrada com sucesso!</div>
+    {% endif %}
+
+    <form method="POST" id="form-venda">
+        <div class="card-dashboard p-4 mb-4">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="text-secondary">Cliente (opcional)</label>
+                    <select name="cliente_id" class="form-control bg-dark text-white">
+                        <option value="">-- Sem cliente --</option>
+                        {% for c in clientes %}
+                        <option value="{{ c.id }}">{{ c.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="text-secondary">Bipe o código de barras do produto</label>
+                <input type="text" id="codigo_barras" class="form-control form-control-lg bg-dark text-white" 
+                       placeholder="Aguardando bipe..." autofocus>
+            </div>
+
+            <div class="mb-3">
+                <button type="button" class="btn btn-outline-warning" onclick="adicionarManual()">
+                    + Adicionar peça manual (Parceiro)
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-dark table-hover" id="tabela-itens">
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th width="100">Estoque</th>
+                            <th width="110">Qtd</th>
+                            <th width="130">Valor Unit.</th>
+                            <th width="120">Total</th>
+                            <th width="150">Origem</th>
+                            <th width="50"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-itens">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <h4 class="text-white">Total: R$ <span id="total-geral">0,00</span></h4>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-light btn-lg" id="btn-pdf" disabled onclick="gerarPDF()">
+                        📄 Gerar PDF
+                    </button>
+                    <button type="submit" class="btn btn-success btn-lg" id="btn-finalizar" disabled>
+                        Finalizar Venda
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- MODAL DE CONSULTA DE ESTOQUE -->
+<div class="modal fade" id="modalConsulta" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title">Consultar Estoque</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="buscaProduto" class="form-control form-control-lg bg-secondary text-white mb-3"
+                       placeholder="Digite o nome da peça (ex: amortecedor toro)...">
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Descrição</th>
+                                <th>Estoque</th>
+                                <th>Preço</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultadoBusca">
+                            <tr>
+                                <td colspan="5" class="text-center text-secondary">Digite pelo menos 2 letras para buscar...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let itens = [];
+let timeoutBusca = null;
+
+document.getElementById('codigo_barras').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const codigo = this.value.trim();
+        if (!codigo) return;
+
+        fetch('/api/produto/codigo/' + encodeURIComponent(codigo))
+            .then(r => r.json())
+            .then(data => {
+                if (data.erro) {
+                    alert('Produto não encontrado.\nUse "Consultar Estoque" ou "Adicionar peça manual".');
+                    this.value = '';
+                    this.focus();
+                    return;
+                }
+                adicionarItem(data);
+                this.value = '';
+                this.focus();
+            });
+    }
+});
+
+document.getElementById('buscaProduto').addEventListener('input', function() {
+    clearTimeout(timeoutBusca);
+    const termo = this.value.trim();
+    
+    if (termo.length < 2) {
+        document.getElementById('resultadoBusca').innerHTML = 
+            '<tr><td colspan="5" class="text-center text-secondary">Digite pelo menos 2 letras...</td></tr>';
+        return;
+    }
+
+    timeoutBusca = setTimeout(() => {
+        fetch('/api/produtos/buscar?q=' + encodeURIComponent(termo))
+            .then(r => r.json())
+            .then(lista => {
+                const tbody = document.getElementById('resultadoBusca');
+                if (lista.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-secondary">Nenhum produto encontrado</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = lista.map(p => {
+                    const estoque = p.estoque_atual || 0;
+                    const badge = estoque > 0 
+                        ? `<span class="badge bg-success">${estoque}</span>` 
+                        : `<span class="badge bg-danger">0</span>`;
+                    
+                    return `
+                        <tr>
+                            <td>${p.codigo || '-'}</td>
+                            <td>${p.descricao}</td>
+                            <td>${badge}</td>
+                            <td>R$ ${Number(p.preco_venda).toFixed(2).replace('.', ',')}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-success" 
+                                    onclick='adicionarDaConsulta(${JSON.stringify(p)})'>
+                                    Adicionar
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            });
+    }, 300);
+});
+
+function adicionarDaConsulta(produto) {
+    adicionarItem(produto);
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalConsulta'));
+    if (modal) modal.hide();
+}
+
+function adicionarItem(data) {
+    const estoque = data.estoque_atual || 0;
+    const origemPadrao = estoque > 0 ? 'ESTOQUE' : 'PARCEIRO';
+
+    const existe = itens.find(i => i.produto_id === data.id && data.id > 0);
+    if (existe) {
+        existe.quantidade += 1;
+        renderItens();
+        return;
+    }
+
+    itens.push({
+        produto_id: data.id || 0,
+        descricao: data.descricao,
+        estoque: estoque,
+        quantidade: 1,
+        valor_unitario: data.preco_venda || 0,
+        origem: origemPadrao
+    });
+    renderItens();
+}
+
+function adicionarManual() {
+    const desc = prompt('Descrição da peça:');
+    if (!desc) return;
+
+    itens.push({
+        produto_id: 0,
+        descricao: desc,
+        estoque: 0,
+        quantidade: 1,
+        valor_unitario: 0,
+        origem: 'PARCEIRO'
+    });
+    renderItens();
+}
+
+function renderItens() {
+    const tbody = document.getElementById('corpo-itens');
+    tbody.innerHTML = '';
+    let total = 0;
+
+    itens.forEach((item, index) => {
+        const subtotal = item.quantidade * item.valor_unitario;
+        total += subtotal;
+
+        const estoqueTxt = item.produto_id > 0 
+            ? (item.estoque > 0 ? item.estoque : '0') 
+            : '-';
+
+        tbody.innerHTML += `
+            <tr>
+                <td>
+                    ${item.descricao}
+                    <input type="hidden" name="produto_id[]" value="${item.produto_id}">
+                    <input type="hidden" name="descricao[]" value="${item.descricao}">
+                </td>
+                <td>
+                    <span class="badge ${item.estoque > 0 ? 'bg-success' : 'bg-danger'}">${estoqueTxt}</span>
+                </td>
+                <td>
+                    <input type="number" name="quantidade[]" value="${item.quantidade}" min="0.001" step="0.001"
+                           class="form-control form-control-sm bg-dark text-white"
+                           onchange="atualizarQtd(${index}, this.value)">
+                </td>
+                <td>
+                    <input type="number" name="valor_unitario[]" value="${item.valor_unitario}" step="0.01"
+                           class="form-control form-control-sm bg-dark text-white"
+                           onchange="atualizarValor(${index}, this.value)">
+                </td>
+                <td>R$ ${subtotal.toFixed(2).replace('.', ',')}</td>
+                <td>
+                    <select name="origem[]" class="form-control form-control-sm bg-dark text-white"
+                            onchange="atualizarOrigem(${index}, this.value)">
+                        <option value="ESTOQUE" ${item.origem === 'ESTOQUE' ? 'selected' : ''}>Estoque Próprio</option>
+                        <option value="PARCEIRO" ${item.origem === 'PARCEIRO' ? 'selected' : ''}>Parceiro</option>
+                    </select>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removerItem(${index})">X</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    document.getElementById('total-geral').innerText = total.toFixed(2).replace('.', ',');
+    document.getElementById('btn-finalizar').disabled = itens.length === 0;
+    document.getElementById('btn-pdf').disabled = itens.length === 0;
+}
+
+function atualizarQtd(index, valor) {
+    itens[index].quantidade = parseFloat(valor) || 0;
+    renderItens();
+}
+
+function atualizarValor(index, valor) {
+    itens[index].valor_unitario = parseFloat(valor) || 0;
+    renderItens();
+}
+
+function atualizarOrigem(index, valor) {
+    itens[index].origem = valor;
+}
+
+function removerItem(index) {
+    itens.splice(index, 1);
+    renderItens();
+}
+
+function gerarPDF() {
+    if (itens.length === 0) return;
+
+    const clienteSelect = document.querySelector('select[name="cliente_id"]');
+    const clienteNome = clienteSelect.options[clienteSelect.selectedIndex].text;
+
+    let html = `
+        <html>
+        <head>
+            <title>Orçamento - Venda de Peças</title>
+            <style>
+                body { 
+                    font-family: Arial, Helvetica, sans-serif; 
+                    padding: 40px; 
+                    color: #222;
+                    max-width: 800px;
+                    margin: 20px auto;
+                    border: 2px solid #1a1a2e;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 3px solid #f0a500;
+                    padding-bottom: 20px;
+                    margin-bottom: 30px;
+                }
+                .header h1 {
+                    margin: 0;
+                    color: #1a1a2e;
+                    font-size: 28px;
+                }
+                .header p {
+                    margin: 4px 0;
+                    color: #555;
+                    font-size: 13px;
+                }
+                .titulo {
+                    background: #1a1a2e;
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 6px;
+                    margin-bottom: 25px;
+                }
+                .titulo h2 {
+                    margin: 0;
+                    font-size: 18px;
+                }
+                .info {
+                    margin-bottom: 25px;
+                    font-size: 14px;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin-top: 10px;
+                    font-size: 14px;
+                }
+                th { 
+                    background: #1a1a2e; 
+                    color: white;
+                    padding: 12px 10px; 
+                    text-align: left;
+                }
+                td { 
+                    border-bottom: 1px solid #ddd; 
+                    padding: 10px; 
+                }
+                tr:nth-child(even) {
+                    background: #f8f9fa;
+                }
+                .total-box {
+                    margin-top: 30px;
+                    text-align: right;
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #1a1a2e;
+                    border-top: 2px solid #f0a500;
+                    padding-top: 15px;
+                }
+                .rodape {
+                    margin-top: 50px;
+                    text-align: center;
+                    font-size: 11px;
+                    color: #999;
+                    border-top: 1px solid #eee;
+                    padding-top: 15px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img src="/static/img/logo_hlcar.png" style="height: 60px; width: auto;" onerror="this.src='/static/icons/icon-192.png'; this.style.height='55px';">
+                    <div>
+                        <h1>HL Car Auto Center</h1>
+                        <p>Oficina Especializada</p>
+                        <p>Documento gerado pelo sistema HLCarERP</p>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+                    <p><strong>Hora:</strong> ${new Date().toLocaleTimeString('pt-BR')}</p>
+                </div>
+            </div>
+
+            <div class="titulo">
+                <h2>ORÇAMENTO / VENDA DE PEÇAS</h2>
+            </div>
+
+            <div class="info">
+                <p><strong>Cliente:</strong> ${clienteNome}</p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto / Descrição</th>
+                        <th style="width:80px">Qtd</th>
+                        <th style="width:110px">Valor Unit.</th>
+                        <th style="width:110px">Total</th>
+                        <th style="width:120px">Origem</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    let total = 0;
+    itens.forEach(item => {
+        const sub = item.quantidade * item.valor_unitario;
+        total += sub;
+        html += `
+            <tr>
+                <td>${item.descricao}</td>
+                <td>${item.quantidade}</td>
+                <td>R$ ${item.valor_unitario.toFixed(2).replace('.', ',')}</td>
+                <td>R$ ${sub.toFixed(2).replace('.', ',')}</td>
+                <td>${item.origem === 'ESTOQUE' ? 'Estoque Próprio' : 'Parceiro'}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+
+            <div class="total-box">
+                Total: R$ ${total.toFixed(2).replace('.', ',')}
+            </div>
+
+            <div class="rodape">
+                <p>Este documento é um orçamento/venda de peças gerado pelo sistema HLCarERP.</p>
+                <p>Validade do orçamento: 7 dias. Obrigado pela preferência!</p>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const janela = window.open('', '_blank');
+    janela.document.write(html);
+    janela.document.close();
+    setTimeout(() => janela.print(), 300);
+}
+</script>
+{% endblock %}

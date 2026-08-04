@@ -72,12 +72,65 @@
             <div class="card-dashboard shadow">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <small class="text-secondary">Faturamento</small>
+                        <small class="text-secondary">Faturamento OS</small>
                         <h3 class="mt-2 fw-bold">
-                            R$ {{ "{:,.2f}".format(faturamento).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                            R$ {{ "{:,.2f}".format(faturamento or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}
                         </h3>
                     </div>
                     <div style="font-size:45px;color:#22c55e"><i class="fa fa-dollar-sign"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVOS CARDS -->
+    <div class="row g-4 mt-1">
+        <div class="col-xl-3 col-md-6">
+            <div class="card-dashboard shadow">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-secondary">Vendas Rápidas (mês)</small>
+                        <h3 class="mt-2 fw-bold">
+                            R$ {{ "{:,.2f}".format(vendas_rapidas_mes or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                        </h3>
+                        <small class="text-success">Hoje: R$ {{ "{:,.2f}".format(vendas_rapidas_hoje or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}</small>
+                    </div>
+                    <div style="font-size:40px;color:#a855f7"><i class="fa fa-shopping-cart"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card-dashboard shadow">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-secondary">Ticket Médio</small>
+                        <h3 class="mt-2 fw-bold">
+                            R$ {{ "{:,.2f}".format(ticket_medio or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                        </h3>
+                    </div>
+                    <div style="font-size:40px;color:#06b6d4"><i class="fa fa-chart-bar"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card-dashboard shadow">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-secondary">OS abertas > 7 dias</small>
+                        <h2 class="mt-2 fw-bold {% if os_antigas > 0 %}text-danger{% endif %}">{{ os_antigas or 0 }}</h2>
+                    </div>
+                    <div style="font-size:40px;color:#ef4444"><i class="fa fa-exclamation-triangle"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card-dashboard shadow">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-secondary">Próximas Revisões</small>
+                        <h2 class="mt-2 fw-bold">{{ revisoes|length if revisoes else 0 }}</h2>
+                    </div>
+                    <div style="font-size:40px;color:#f97316"><i class="fa fa-calendar-alt"></i></div>
                 </div>
             </div>
         </div>
@@ -186,7 +239,7 @@
                 <h5><i class="fa fa-money-bill-wave"></i> Financeiro</h5>
                 <hr>
                 <p class="mb-2">💰 Contas a Receber</p>
-                <h3>R$ {{ "{:,.2f}".format(contas_receber).replace(",", "X").replace(".", ",").replace("X", ".") }}</h3>
+                <h3>R$ {{ "{:,.2f}".format(contas_receber or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}</h3>
             </div>
         </div>
     </div>
@@ -273,6 +326,40 @@
         </div>
     </div>
 
+    <!-- PRÓXIMAS REVISÕES -->
+    {% if revisoes %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card-dashboard shadow">
+                <h5><i class="fa fa-calendar-alt"></i> Próximas Revisões</h5>
+                <hr>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Placa</th>
+                                <th>Cliente</th>
+                                <th>Data</th>
+                                <th>KM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in revisoes %}
+                            <tr>
+                                <td class="text-warning">{{ r.placa }}</td>
+                                <td>{{ r.cliente }}</td>
+                                <td>{{ r.data }}</td>
+                                <td>{{ r.km }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -310,7 +397,7 @@
     }
 })();
 
-// ===== AGENDA (mesmo JS de antes) =====
+// ===== AGENDA =====
 let agendaAtual = [];
 
 function minutosParaHora(min) {

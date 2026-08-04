@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Entrada Rápida por Bipe{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <h2 class="mb-4 text-white">Entrada Rápida por Bipe</h2>
+
+    {% if request.args.get('sucesso') %}
+    <div class="alert alert-success">Estoque atualizado com sucesso!</div>
+    {% endif %}
+
+    <div class="card-dashboard p-4" style="max-width: 600px;">
+        <div class="mb-3">
+            <label class="text-secondary">Bipe o código de barras</label>
+            <input type="text" id="codigo_barras" class="form-control form-control-lg bg-dark text-white" 
+                   placeholder="Aguardando bipe..." autofocus>
+        </div>
+
+        <div id="produto_info" style="display:none;">
+            <div class="mb-3">
+                <label class="text-secondary">Produto</label>
+                <input type="text" id="descricao" class="form-control bg-dark text-white" readonly>
+            </div>
+
+            <div class="row">
+                <div class="col-6 mb-3">
+                    <label class="text-secondary">Quantidade</label>
+                    <input type="number" id="quantidade" class="form-control bg-dark text-white" value="1" min="0.001" step="0.001">
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="text-secondary">Custo unitário (opcional)</label>
+                    <input type="number" id="custo" class="form-control bg-dark text-white" value="0" step="0.01">
+                </div>
+            </div>
+
+            <form method="POST" id="form-entrada">
+                <input type="hidden" name="produto_id" id="produto_id">
+                <input type="hidden" name="quantidade" id="qtd_hidden">
+                <input type="hidden" name="custo" id="custo_hidden">
+
+                <button type="submit" class="btn btn-success btn-lg w-100">
+                    Confirmar Entrada
+                </button>
+            </form>
+        </div>
+
+        <div id="nao_encontrado" class="alert alert-warning mt-3" style="display:none;">
+            Produto não encontrado. Cadastre primeiro no estoque.
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('codigo_barras').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const codigo = this.value.trim();
+        if (!codigo) return;
+
+        fetch('/api/produto/codigo/' + encodeURIComponent(codigo))
+            .then(r => r.json())
+            .then(data => {
+                if (data.erro) {
+                    document.getElementById('produto_info').style.display = 'none';
+                    document.getElementById('nao_encontrado').style.display = 'block';
+                    this.value = '';
+                    this.focus();
+                    return;
+                }
+
+                document.getElementById('nao_encontrado').style.display = 'none';
+                document.getElementById('produto_info').style.display = 'block';
+                document.getElementById('produto_id').value = data.id;
+                document.getElementById('descricao').value = data.descricao;
+                document.getElementById('custo').value = data.preco_compra || 0;
+                document.getElementById('quantidade').value = 1;
+                document.getElementById('quantidade').focus();
+            });
+    }
+});
+
+document.getElementById('form-entrada').addEventListener('submit', function() {
+    document.getElementById('qtd_hidden').value = document.getElementById('quantidade').value;
+    document.getElementById('custo_hidden').value = document.getElementById('custo').value;
+});
+</script>
+{% endblock %}

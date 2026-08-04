@@ -221,6 +221,14 @@ display:none;
 
     <ul class="menu">
         <li><a href="/"><i class="fa fa-chart-line me-2"></i> Dashboard</a></li>
+<li>
+    <a href="/lembretes">
+        <i class="fa fa-bell me-2"></i> Lembretes
+        {% if lembretes_pendentes and lembretes_pendentes > 0 %}
+        <span class="badge bg-danger rounded-pill ms-1">{{ lembretes_pendentes }}</span>
+        {% endif %}
+    </a>
+</li>
         <li><a href="/clientes"><i class="fa fa-users me-2"></i> Clientes</a></li>
         <li><a href="/veiculos"><i class="fa fa-car me-2"></i> Veículos</a></li>
         <li><a href="/ordens"><i class="fa fa-file-alt me-2"></i> Ordem de Serviço</a></li>

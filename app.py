@@ -36,6 +36,9 @@ from models import (
     Usuario,
     Empresa,
     ItemOrdemServico,
+    VendaRapida,
+    ItemVendaRapida,
+    LembreteEnvio,
 )
 
 from pdf_ordem_old import gerar_pdf_ordem
@@ -345,6 +348,72 @@ def dashboard():
     except Exception:
         mecanicos = []
 
+    # ========== NOVAS INFORMAÇÕES DO DASHBOARD ==========
+
+    # 1. Vendas Rápidas
+    try:
+        inicio_mes = hoje.replace(day=1)
+        vendas_rapidas_mes = (
+            VendaRapida.query
+            .filter(func.date(VendaRapida.criado_em) >= inicio_mes)
+            .with_entities(func.coalesce(func.sum(VendaRapida.valor_total), 0))
+            .scalar() or 0
+        )
+        vendas_rapidas_hoje = (
+            VendaRapida.query
+            .filter(func.date(VendaRapida.criado_em) == hoje)
+            .with_entities(func.coalesce(func.sum(VendaRapida.valor_total), 0))
+            .scalar() or 0
+        )
+    except Exception:
+        vendas_rapidas_mes = 0
+        vendas_rapidas_hoje = 0
+
+    # 2. Ticket médio
+    try:
+        qtd_os = query_os.count() or 1
+        ticket_medio = float(faturamento or 0) / qtd_os
+    except Exception:
+        ticket_medio = 0
+
+    # 3. OS abertas há mais de 7 dias
+    try:
+        limite = hoje - timedelta(days=7)
+        os_antigas = (
+            OrdemServico.query
+            .filter(OrdemServico.status == "ABERTA")
+            .filter(func.date(OrdemServico.data_abertura) <= limite)
+            .count()
+        )
+    except Exception:
+        os_antigas = 0
+
+    # 4. Próximas revisões
+    try:
+        revisoes = []
+        for v in Veiculo.query.order_by(Veiculo.proxima_revisao_data).all():
+            data_rev = getattr(v, "proxima_revisao_data", None)
+            km_rev = getattr(v, "proxima_revisao_km", None)
+            km_atual = getattr(v, "km", None) or 0
+
+            precisa = False
+            if data_rev and data_rev <= hoje + timedelta(days=30):
+                precisa = True
+            if km_rev and km_atual and (km_rev - km_atual) <= 1000:
+                precisa = True
+
+            if precisa:
+                cliente_nome = v.cliente.nome if getattr(v, "cliente", None) else "-"
+                revisoes.append({
+                    "placa": v.placa,
+                    "cliente": cliente_nome,
+                    "data": data_rev.strftime("%d/%m/%Y") if data_rev else "-",
+                    "km": km_rev or "-"
+                })
+        revisoes = revisoes[:6]
+    except Exception:
+        revisoes = []
+
     return render_template(
         "dashboard.html",
         total_clientes=total_clientes,
@@ -362,6 +431,11 @@ def dashboard():
         produtos_baixo=produtos_baixo,
         labels_grafico=labels_grafico,
         valores_grafico=valores_grafico,
+                vendas_rapidas_mes=vendas_rapidas_mes,
+        vendas_rapidas_hoje=vendas_rapidas_hoje,
+        ticket_medio=ticket_medio,
+        os_antigas=os_antigas,
+        revisoes=revisoes,
     )
 
 
@@ -804,28 +878,174 @@ def nova_ordem():
 @login_required
 def editar_ordem(id):
     ordem = OrdemServico.query.get_or_404(id)
+        # BLOQUEIA EDIÇÃO SE JÁ ESTIVER FINALIZADA
+    if ordem.status == "FINALIZADA":
+        return redirect("/ordens")
+
     if request.method == "POST":
+        valor_pecas = float(request.form.get("valor_pecas") or 0)
+        desconto = float(request.form.get("desconto") or 0)
+
+        descs = request.form.getlist("servico_desc")
+        mecs = request.form.getlist("servico_mecanico_id")
+        horas_list = request.form.getlist("servico_horas")
+        minutos_list = request.form.getlist("servico_minutos")
+        vals = request.form.getlist("servico_valor")
+
+        nomes = []
+        total_servicos = 0.0
+        detalhes = []
+
+        for i in range(len(descs)):
+            try:
+                mid = int(mecs[i]) if i < len(mecs) and mecs[i] else 0
+                if mid <= 0:
+                    continue
+                m = Mecanico.query.get(mid)
+                if not m:
+                    continue
+                serv = (descs[i] or "").strip() or m.nome
+                horas = int(horas_list[i] or 0) if i < len(horas_list) else 0
+                minutos = int(minutos_list[i] or 0) if i < len(minutos_list) else 40
+                dur = (horas * 60) + minutos
+                if dur < 5:
+                    dur = 40
+                val = float(vals[i]) if i < len(vals) and vals[i] else 0
+                nomes.append(m.nome)
+                total_servicos += val
+                detalhes.append({
+                    "mecanico": m,
+                    "duracao": dur,
+                    "valor": val,
+                    "servico": serv,
+                })
+            except Exception:
+                pass
+
+        total = total_servicos + valor_pecas - desconto
+
         ordem.cliente_id = int(request.form["cliente_id"])
         ordem.veiculo_id = int(request.form["veiculo_id"])
         ordem.km = int(request.form["km"]) if request.form.get("km") else None
         ordem.defeito_relatado = request.form.get("defeito_relatado")
         ordem.diagnostico = request.form.get("diagnostico")
         ordem.servico_executado = request.form.get("servico_executado")
-        ordem.mecanico = request.form.get("mecanico")
-        ordem.valor_servicos = float(request.form.get("valor_servicos") or 0)
-        ordem.valor_produtos = float(request.form.get("valor_pecas") or 0)
-        ordem.desconto = float(request.form.get("desconto") or 0)
-        ordem.valor_total = ordem.valor_servicos + ordem.valor_produtos - ordem.desconto
-        ordem.status = request.form.get("status", "ABERTA")
+        ordem.mecanico = ", ".join(nomes) if nomes else ordem.mecanico
+        ordem.valor_servicos = total_servicos
+        ordem.valor_produtos = valor_pecas
+        ordem.desconto = desconto
+        ordem.valor_total = total
+        ordem.status = request.form.get("status") or "ABERTA"
+
+        # Remove serviços e peças antigos
+        OrdemServicoMecanico.query.filter_by(ordem_servico_id=ordem.id).delete()
+        ItemOrdemServico.query.filter_by(ordem_servico_id=ordem.id).delete()
+        db.session.flush()
+
+        # Serviços novos
+        for d in detalhes:
+            m = d["mecanico"]
+            perc = float(m.percentual_comissao or 20)
+            base = d["valor"]
+            comissao = round(base * perc / 100.0, 2)
+            db.session.add(OrdemServicoMecanico(
+                ordem_servico_id=ordem.id,
+                mecanico_id=m.id,
+                duracao_estimada_min=d["duracao"],
+                valor_mercado=0,
+                valor_negociado=d["valor"],
+                percentual_comissao=perc,
+                base_comissao=base,
+                valor_comissao=comissao,
+                descricao_servico=d["servico"],
+            ))
+
+        # Peças novas
+        produtos_ids = request.form.getlist("item_produto_id")
+        tipos = request.form.getlist("item_tipo")
+        descricoes = request.form.getlist("item_descricao")
+        qtds = request.form.getlist("item_qtd")
+        valores_unit = request.form.getlist("item_valor_unit")
+
+        n = max(len(produtos_ids), len(tipos), len(descricoes), len(qtds), len(valores_unit))
+
+        for i in range(n):
+            try:
+                tipo = (tipos[i] if i < len(tipos) else "ESTOQUE") or "ESTOQUE"
+                tipo = tipo.upper().strip()
+
+                try:
+                    pid = int(produtos_ids[i] or 0) if i < len(produtos_ids) else 0
+                except Exception:
+                    pid = 0
+
+                desc = (descricoes[i] if i < len(descricoes) else "") or ""
+                desc = desc.strip()
+
+                try:
+                    qtd = float(qtds[i] if i < len(qtds) else 1)
+                except Exception:
+                    qtd = 1.0
+
+                try:
+                    vu = float(valores_unit[i] if i < len(valores_unit) else 0)
+                except Exception:
+                    vu = 0.0
+
+                if qtd <= 0:
+                    continue
+
+                prod = None
+                if tipo == "ESTOQUE" and pid > 0:
+                    prod = Produto.query.get(pid)
+                    if prod and not desc:
+                        desc = prod.descricao or f"Produto #{pid}"
+                elif not desc:
+                    continue
+
+                if not desc:
+                    desc = "Peça"
+
+                db.session.add(ItemOrdemServico(
+                    ordem_servico_id=ordem.id,
+                    produto_id=pid if pid > 0 else None,
+                    origem=tipo if tipo in ("ESTOQUE", "PARCEIRO") else "ESTOQUE",
+                    tipo_item="PRODUTO",
+                    descricao=desc,
+                    quantidade=qtd,
+                    valor_unitario=vu,
+                    valor_total=qtd * vu,
+                ))
+            except Exception as e:
+                print("Erro item OS (edit):", e)
+
         db.session.commit()
         return redirect("/ordens")
+
     clientes = Cliente.query.order_by(Cliente.nome).all()
     veiculos = Veiculo.query.order_by(Veiculo.placa).all()
     try:
-        lista_mecanicos = Mecanico.query.filter_by(ativo=True).order_by(Mecanico.nome).all()
+        mecanicos = Mecanico.query.filter_by(ativo=True).order_by(Mecanico.nome).all()
     except Exception:
-        lista_mecanicos = []
-    return render_template("editar_ordem.html", ordem=ordem, clientes=clientes, veiculos=veiculos, mecanicos=lista_mecanicos)
+        mecanicos = []
+    try:
+        produtos = Produto.query.order_by(Produto.descricao).all()
+    except Exception:
+        produtos = []
+
+    servicos_os = OrdemServicoMecanico.query.filter_by(ordem_servico_id=ordem.id).all()
+    itens_os = ItemOrdemServico.query.filter_by(ordem_servico_id=ordem.id).all()
+
+    return render_template(
+        "editar_ordem.html",
+        ordem=ordem,
+        clientes=clientes,
+        veiculos=veiculos,
+        mecanicos=mecanicos,
+        produtos=produtos,
+        servicos_os=servicos_os,
+        itens_os=itens_os,
+    )
 
 
 @app.route("/ordens/finalizar/<int:id>")
@@ -841,6 +1061,12 @@ def finalizar_ordem(id):
 @login_required
 def excluir_ordem(id):
     ordem = OrdemServico.query.get_or_404(id)
+
+    # Apaga primeiro tudo que está ligado à ordem
+    OrdemServicoMecanico.query.filter_by(ordem_servico_id=ordem.id).delete()
+    ItemOrdemServico.query.filter_by(ordem_servico_id=ordem.id).delete()
+    Agendamento.query.filter_by(ordem_servico_id=ordem.id).delete()
+
     db.session.delete(ordem)
     db.session.commit()
     return redirect("/ordens")
@@ -1854,7 +2080,434 @@ def api_offline_ordens():
         "valor_total": float(getattr(o, "valor_total", 0) or 0),
         "data_abertura": o.data_abertura.isoformat() if o.data_abertura else None,
     } for o in lista])
+# ============================================================
+# API - BUSCA PRODUTO POR CÓDIGO DE BARRAS (BIPE)
+# ============================================================
+@app.route("/api/produto/codigo/<codigo>")
+@login_required
+def api_produto_por_codigo(codigo):
+    codigo = (codigo or "").strip()
+    if not codigo:
+        return jsonify({"erro": "Código vazio"}), 400
+
+    # Procura no campo codigo
+    produto = Produto.query.filter(
+        (Produto.codigo == codigo) | 
+        (Produto.codigo == codigo.lstrip("0"))
+    ).first()
+
+    # Se não achou e existir o campo codigo_barras, procura nele também
+    if not produto and hasattr(Produto, "codigo_barras"):
+        produto = Produto.query.filter(
+            (Produto.codigo_barras == codigo) | 
+            (Produto.codigo_barras == codigo.lstrip("0"))
+        ).first()
+
+    if not produto:
+        return jsonify({"erro": "Produto não encontrado"}), 404
+
+    return jsonify({
+        "id": produto.id,
+        "codigo": produto.codigo,
+        "descricao": produto.descricao,
+        "estoque_atual": float(getattr(produto, "estoque_atual", 0) or 0),
+        "preco_venda": float(getattr(produto, "preco_venda", 0) or 0),
+        "preco_compra": float(getattr(produto, "preco_compra", 0) or 0),
+    })
+@app.route("/api/produtos/buscar")
+@login_required
+def api_produtos_buscar():
+    termo = (request.args.get("q") or "").strip()
+    if len(termo) < 2:
+        return jsonify([])
+
+    produtos = Produto.query.filter(
+        (Produto.descricao.ilike(f"%{termo}%")) |
+        (Produto.codigo.ilike(f"%{termo}%")) |
+        (Produto.codigo_barras.ilike(f"%{termo}%"))
+    ).order_by(Produto.descricao).limit(30).all()
+
+    return jsonify([{
+        "id": p.id,
+        "codigo": p.codigo,
+        "descricao": p.descricao,
+        "estoque_atual": float(getattr(p, "estoque_atual", 0) or 0),
+        "preco_venda": float(getattr(p, "preco_venda", 0) or 0),
+        "preco_compra": float(getattr(p, "preco_compra", 0) or 0),
+    } for p in produtos])
+@app.route("/estoque/entrada-rapida", methods=["GET", "POST"])
+@login_required
+def entrada_rapida():
+    if request.method == "POST":
+        try:
+            produto_id = int(request.form.get("produto_id") or 0)
+            quantidade = float(request.form.get("quantidade") or 0)
+            custo = float(request.form.get("custo") or 0)
+
+            if produto_id <= 0 or quantidade <= 0:
+                return redirect("/estoque/entrada-rapida")
+
+            produto = Produto.query.get_or_404(produto_id)
+            atual = float(getattr(produto, "estoque_atual", 0) or 0)
+            produto.estoque_atual = atual + quantidade
+
+            if custo > 0 and hasattr(produto, "preco_compra"):
+                produto.preco_compra = custo
+
+            # Registra movimentação
+            mov = MovimentacaoEstoque(
+                produto_id=produto.id,
+                tipo="ENTRADA",
+                quantidade=quantidade,
+                observacao="Entrada rápida por bipe"
+            )
+            db.session.add(mov)
+            db.session.commit()
+
+            return redirect("/estoque/entrada-rapida?sucesso=1")
+        except Exception as e:
+            db.session.rollback()
+            print("Erro entrada rápida:", e)
+            return redirect("/estoque/entrada-rapida")
+
+    return render_template("entrada_rapida.html")
+# ============================================================
+# VENDA RÁPIDA DE PEÇAS
+# ============================================================
+
+@app.route("/venda-rapida", methods=["GET", "POST"])
+@login_required
+def venda_rapida():
+    if request.method == "POST":
+        try:
+            cliente_id = request.form.get("cliente_id") or None
+            if cliente_id:
+                cliente_id = int(cliente_id)
+
+            produtos_ids = request.form.getlist("produto_id[]")
+            quantidades = request.form.getlist("quantidade[]")
+            valores = request.form.getlist("valor_unitario[]")
+            origens = request.form.getlist("origem[]")
+            descricoes = request.form.getlist("descricao[]")
+
+            if not produtos_ids:
+                return redirect("/venda-rapida")
+
+            venda = VendaRapida(
+                empresa_id=session.get("empresa_id") or 1,
+                cliente_id=cliente_id,
+                usuario_id=session.get("usuario_id"),
+                valor_total=0
+            )
+            db.session.add(venda)
+            db.session.flush()
+
+            total = 0.0
+
+            for i in range(len(produtos_ids)):
+                try:
+                    pid = int(produtos_ids[i] or 0)
+                    qtd = float(quantidades[i] or 0)
+                    valor = float(valores[i] or 0)
+                    origem = origens[i] if i < len(origens) else "ESTOQUE"
+                    desc = descricoes[i] if i < len(descricoes) else ""
+
+                    if qtd <= 0:
+                        continue
+
+                    item = ItemVendaRapida(
+                        venda_id=venda.id,
+                        produto_id=pid if pid > 0 else None,
+                        descricao=desc,
+                        quantidade=qtd,
+                        valor_unitario=valor,
+                        valor_total=qtd * valor,
+                        origem=origem
+                    )
+                    db.session.add(item)
+                    total += qtd * valor
+
+                    # Baixa estoque somente se for ESTOQUE próprio
+                    if origem == "ESTOQUE" and pid > 0:
+                        produto = Produto.query.get(pid)
+                        if produto:
+                            atual = float(produto.estoque_atual or 0)
+                            produto.estoque_atual = max(0, atual - qtd)
+
+                            # Registra movimentação
+                            mov = MovimentacaoEstoque(
+                                empresa_id=session.get("empresa_id") or 1,
+                                produto_id=pid,
+                                tipo_movimento="SAIDA",
+                                origem="VENDA_RAPIDA",
+                                quantidade=qtd,
+                                saldo_anterior=atual,
+                                saldo_atual=max(0, atual - qtd),
+                                custo_unitario=float(produto.preco_compra or 0),
+                                valor_total=qtd * float(produto.preco_compra or 0),
+                                observacoes=f"Venda Rápida #{venda.id}"
+                            )
+                            db.session.add(mov)
+
+                except Exception as e:
+                    print("Erro item venda:", e)
+                    continue
+
+            venda.valor_total = total
+            db.session.commit()
+            return redirect("/venda-rapida?sucesso=1")
+
+        except Exception as e:
+            db.session.rollback()
+            print("Erro venda rápida:", e)
+            return redirect("/venda-rapida")
+
+    clientes = Cliente.query.order_by(Cliente.nome).all()
+    return render_template("venda_rapida.html", clientes=clientes)
 
 
+@app.route("/vendas-rapidas")
+@login_required
+def listar_vendas_rapidas():
+    vendas = VendaRapida.query.order_by(VendaRapida.id.desc()).limit(100).all()
+    return render_template("vendas_rapidas.html", vendas=vendas)
+
+
+@app.route("/ordens/pdf/<int:id>")
+@login_required
+def ordem_pdf(id):
+    ordem = OrdemServico.query.get_or_404(id)
+    try:
+        from pdf_ordem import gerar_pdf_ordem
+        pdf = gerar_pdf_ordem(ordem)
+        return send_file(pdf, as_attachment=False, download_name=f"OS_{ordem.numero or ordem.id}.pdf")
+    except Exception as e:
+        print("Erro PDF ordem:", e)
+        return f"<h1>OS #{ordem.numero or ordem.id}</h1><p>Cliente: {ordem.cliente.nome if ordem.cliente else '-'}</p><p>Total: R$ {ordem.valor_total or 0}</p>"
+
+
+@app.route("/lembretes")
+@login_required
+def lembretes():
+    hoje = date.today()
+    ano = hoje.year
+
+    aniversariantes = []
+    try:
+        for c in Cliente.query.all():
+            dn = getattr(c, "data_nascimento", None)
+            if dn and dn.month == hoje.month and dn.day == hoje.day:
+                envio = LembreteEnvio.query.filter_by(
+                    tipo="ANIVERSARIO",
+                    cliente_id=c.id,
+                    ano=ano
+                ).first()
+                aniversariantes.append({
+                    "id": c.id,
+                    "nome": c.nome,
+                    "whatsapp": getattr(c, "whatsapp", None),
+                    "telefone": getattr(c, "telefone", None),
+                    "enviado": envio is not None,
+                })
+    except Exception as e:
+        print("Erro aniversariantes:", e)
+
+    revisoes = []
+    try:
+        for v in Veiculo.query.all():
+            data_rev = getattr(v, "proxima_revisao_data", None)
+            km_rev = getattr(v, "proxima_revisao_km", None)
+            km_atual = getattr(v, "km", None) or 0
+
+            precisa = False
+            motivo = ""
+            if data_rev and data_rev <= hoje + timedelta(days=30):
+                precisa = True
+                motivo = f"Data: {data_rev.strftime('%d/%m/%Y')}"
+            if km_rev and km_atual and (km_rev - km_atual) <= 1000:
+                precisa = True
+                motivo = (motivo + " | " if motivo else "") + f"KM: {km_rev}"
+
+            if not precisa:
+                continue
+
+            # Se foi dispensado para esta data de revisão, não mostra
+            dispensa = LembreteEnvio.query.filter_by(
+                tipo="DISPENSA_REVISAO",
+                veiculo_id=v.id,
+                data_revisao_ref=data_rev
+            ).first()
+            if dispensa:
+                continue
+
+            cliente = None
+            try:
+                cliente = v.cliente
+            except Exception:
+                pass
+            if not cliente and getattr(v, "cliente_id", None):
+                cliente = Cliente.query.get(v.cliente_id)
+
+            fone = None
+            nome = "-"
+            cliente_id = None
+            if cliente:
+                nome = cliente.nome or "-"
+                fone = getattr(cliente, "whatsapp", None) or getattr(cliente, "telefone", None) or ""
+                cliente_id = cliente.id
+
+            atrasada = False
+            if data_rev and data_rev < hoje:
+                atrasada = True
+            if km_rev and km_atual and km_atual >= km_rev:
+                atrasada = True
+
+            envios = LembreteEnvio.query.filter_by(
+                tipo="REVISAO",
+                veiculo_id=v.id,
+                data_revisao_ref=data_rev
+            ).all()
+            qtd_envios = sum(e.quantidade or 1 for e in envios)
+
+            revisoes.append({
+                "veiculo_id": v.id,
+                "placa": v.placa,
+                "marca": getattr(v, "marca", "") or "",
+                "modelo": getattr(v, "modelo", "") or "",
+                "cliente_id": cliente_id,
+                "cliente_nome": nome,
+                "cliente_whatsapp": fone,
+                "motivo": motivo,
+                "atrasada": atrasada,
+                "data_rev": data_rev,
+                "qtd_envios": qtd_envios,
+            })
+    except Exception as e:
+        print("Erro revisoes:", e)
+        revisoes = []
+
+    return render_template(
+        "lembretes.html",
+        aniversariantes=aniversariantes,
+        revisoes=revisoes,
+        hoje=hoje,
+    )
+
+
+@app.route("/lembretes/marcar-enviado", methods=["POST"])
+@login_required
+def lembretes_marcar_enviado():
+    tipo = request.form.get("tipo")
+    cliente_id = request.form.get("cliente_id")
+    veiculo_id = request.form.get("veiculo_id")
+    data_rev = request.form.get("data_rev") or None
+
+    try:
+        if tipo == "ANIVERSARIO" and cliente_id:
+            ano = date.today().year
+            existe = LembreteEnvio.query.filter_by(
+                tipo="ANIVERSARIO",
+                cliente_id=int(cliente_id),
+                ano=ano
+            ).first()
+            if not existe:
+                db.session.add(LembreteEnvio(
+                    tipo="ANIVERSARIO",
+                    cliente_id=int(cliente_id),
+                    ano=ano,
+                    quantidade=1
+                ))
+                db.session.commit()
+
+        elif tipo == "REVISAO" and veiculo_id:
+            data_ref = None
+            if data_rev:
+                try:
+                    data_ref = datetime.strptime(data_rev, "%Y-%m-%d").date()
+                except Exception:
+                    pass
+            envio = LembreteEnvio.query.filter_by(
+                tipo="REVISAO",
+                veiculo_id=int(veiculo_id),
+                data_revisao_ref=data_ref
+            ).first()
+            if envio:
+                envio.quantidade = (envio.quantidade or 1) + 1
+                envio.enviado_em = datetime.utcnow()
+            else:
+                db.session.add(LembreteEnvio(
+                    tipo="REVISAO",
+                    veiculo_id=int(veiculo_id),
+                    cliente_id=int(cliente_id) if cliente_id else None,
+                    data_revisao_ref=data_ref,
+                    quantidade=1
+                ))
+            db.session.commit()
+
+        elif tipo == "DISPENSA_REVISAO" and veiculo_id:
+            data_ref = None
+            if data_rev:
+                try:
+                    data_ref = datetime.strptime(data_rev, "%Y-%m-%d").date()
+                except Exception:
+                    pass
+            existe = LembreteEnvio.query.filter_by(
+                tipo="DISPENSA_REVISAO",
+                veiculo_id=int(veiculo_id),
+                data_revisao_ref=data_ref
+            ).first()
+            if not existe:
+                db.session.add(LembreteEnvio(
+                    tipo="DISPENSA_REVISAO",
+                    veiculo_id=int(veiculo_id),
+                    data_revisao_ref=data_ref,
+                    quantidade=1
+                ))
+                db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print("Erro marcar enviado:", e)
+
+    return redirect("/lembretes")
+@app.context_processor
+def inject_lembretes_pendentes():
+    try:
+        hoje = date.today()
+        ano = hoje.year
+        pendentes = 0
+
+        # Aniversários não enviados
+        for c in Cliente.query.all():
+            dn = getattr(c, "data_nascimento", None)
+            if dn and dn.month == hoje.month and dn.day == hoje.day:
+                envio = LembreteEnvio.query.filter_by(
+                    tipo="ANIVERSARIO", cliente_id=c.id, ano=ano
+                ).first()
+                if not envio:
+                    pendentes += 1
+
+        # Revisões não dispensadas
+        for v in Veiculo.query.all():
+            data_rev = getattr(v, "proxima_revisao_data", None)
+            km_rev = getattr(v, "proxima_revisao_km", None)
+            km_atual = getattr(v, "km", None) or 0
+            precisa = False
+            if data_rev and data_rev <= hoje + timedelta(days=30):
+                precisa = True
+            if km_rev and km_atual and (km_rev - km_atual) <= 1000:
+                precisa = True
+            if not precisa:
+                continue
+            dispensa = LembreteEnvio.query.filter_by(
+                tipo="DISPENSA_REVISAO",
+                veiculo_id=v.id,
+                data_revisao_ref=data_rev
+            ).first()
+            if not dispensa:
+                pendentes += 1
+
+        return {"lembretes_pendentes": pendentes}
+    except Exception:
+        return {"lembretes_pendentes": 0}
 if __name__ == "__main__":
     app.run(debug=True)

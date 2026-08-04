@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Lembretes do Dia{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-white mb-1">
+                <i class="fa fa-bell"></i> Lembretes do Dia
+            </h2>
+            <small class="text-secondary">
+                {{ hoje.strftime('%d/%m/%Y') }} — Clique no WhatsApp, depois marque como enviado
+            </small>
+        </div>
+        <a href="/" class="btn btn-outline-light btn-sm">Voltar ao Dashboard</a>
+    </div>
+
+    <!-- ANIVERSARIANTES -->
+    <div class="card-dashboard shadow mb-4">
+        <h5 class="mb-3">
+            <i class="fa fa-birthday-cake text-warning"></i>
+            Aniversariantes de hoje
+        </h5>
+
+        {% if aniversariantes %}
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Telefone / WhatsApp</th>
+                        <th width="280">Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in aniversariantes %}
+                    {% set fone = (c.whatsapp or c.telefone or '')|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '')|replace('+', '') %}
+                    {% if fone.startswith('55') %}
+                        {% set fone_final = fone %}
+                    {% else %}
+                        {% set fone_final = '55' + fone %}
+                    {% endif %}
+                    <tr>
+                        <td class="fw-bold">{{ c.nome }}</td>
+                        <td>{{ c.whatsapp or c.telefone or '-' }}</td>
+                        <td>
+                            {% if c.enviado %}
+                                <span class="badge bg-success">Enviado</span>
+                            {% else %}
+                                {% if fone|length >= 10 %}
+                                <a href="https://web.whatsapp.com/send?phone={{ fone_final }}&text={{ ('Ola ' ~ c.nome ~ '! Hoje e um dia muito especial e a equipe da HL Car Auto Center quer deixar registrado o nosso carinho. Desejamos que seu aniversario seja repleto de saude, conquistas e momentos felizes ao lado de quem voce ama. Conte sempre conosco para cuidar do seu veiculo com atencao e compromisso. Feliz aniversario!')|urlencode }}"
+                                   target="_blank"
+                                   class="btn btn-success btn-sm me-1">
+                                    <i class="fa fa-whatsapp"></i> WhatsApp
+                                </a>
+                                {% endif %}
+                                <form method="POST" action="/lembretes/marcar-enviado" style="display:inline">
+                                    <input type="hidden" name="tipo" value="ANIVERSARIO">
+                                    <input type="hidden" name="cliente_id" value="{{ c.id }}">
+                                    <button type="submit" class="btn btn-outline-success btn-sm">
+                                        Marcar enviado
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-secondary mb-0">Nenhum aniversariante hoje.</p>
+        {% endif %}
+    </div>
+
+    <!-- REVISÕES -->
+    <div class="card-dashboard shadow">
+        <h5 class="mb-3">
+            <i class="fa fa-car text-warning"></i>
+            Revisões próximas (30 dias ou KM)
+        </h5>
+
+        {% if revisoes %}
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Placa</th>
+                        <th>Veículo</th>
+                        <th>Cliente</th>
+                        <th>Telefone</th>
+                        <th>Motivo</th>
+                        <th>Envios</th>
+                        <th width="320">Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in revisoes %}
+                    {% set fone = (r.cliente_whatsapp or '')|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '')|replace('+', '') %}
+                    {% if fone.startswith('55') %}
+                        {% set fone_final = fone %}
+                    {% else %}
+                        {% set fone_final = '55' + fone %}
+                    {% endif %}
+                    <tr>
+                        <td class="text-warning fw-bold">{{ r.placa }}</td>
+                        <td>{{ r.marca }} {{ r.modelo }}</td>
+                        <td>{{ r.cliente_nome }}</td>
+                        <td>{{ r.cliente_whatsapp or '-' }}</td>
+                        <td>
+                            {% if r.atrasada %}
+                            <span class="badge bg-danger">ATRASADA</span>
+                            {% endif %}
+                            <small>{{ r.motivo }}</small>
+                        </td>
+                        <td>
+                            {% if r.qtd_envios > 0 %}
+                            <span class="badge bg-info">Enviado {{ r.qtd_envios }}x</span>
+                            {% else %}
+                            <span class="text-secondary small">Nenhum</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if fone|length >= 10 %}
+                                {% if r.atrasada %}
+                                <a href="https://web.whatsapp.com/send?phone={{ fone_final }}&text={{ ('Ola ' ~ r.cliente_nome ~ '! Identificamos que a revisao do veiculo ' ~ r.placa ~ ' (' ~ r.marca ~ ' ' ~ r.modelo ~ ') esta ATRASADA. ' ~ r.motivo ~ '. Recomendamos agendar o mais breve possivel para manter a seguranca e o bom funcionamento do seu carro. Estamos a disposicao na HL Car Auto Center!')|urlencode }}"
+                                   target="_blank"
+                                   class="btn btn-danger btn-sm me-1">
+                                    <i class="fa fa-whatsapp"></i>
+                                </a>
+                                {% else %}
+                                <a href="https://web.whatsapp.com/send?phone={{ fone_final }}&text={{ ('Ola ' ~ r.cliente_nome ~ '! Passando para lembrar que o veiculo ' ~ r.placa ~ ' (' ~ r.marca ~ ' ' ~ r.modelo ~ ') esta proximo da revisao. ' ~ r.motivo ~ '. Agendar agora evita imprevistos e mantem seu carro seguro. Estamos a disposicao na HL Car Auto Center!')|urlencode }}"
+                                   target="_blank"
+                                   class="btn btn-success btn-sm me-1">
+                                    <i class="fa fa-whatsapp"></i>
+                                </a>
+                                {% endif %}
+                            {% endif %}
+
+                            <form method="POST" action="/lembretes/marcar-enviado" style="display:inline">
+                                <input type="hidden" name="tipo" value="REVISAO">
+                                <input type="hidden" name="veiculo_id" value="{{ r.veiculo_id }}">
+                                <input type="hidden" name="cliente_id" value="{{ r.cliente_id or '' }}">
+                                <input type="hidden" name="data_rev" value="{{ r.data_rev.strftime('%Y-%m-%d') if r.data_rev else '' }}">
+                                <button type="submit" class="btn btn-outline-info btn-sm me-1">
+                                    Marcar enviado
+                                </button>
+                            </form>
+
+                            <form method="POST" action="/lembretes/marcar-enviado" style="display:inline"
+                                  onsubmit="return confirm('Dispensar este aviso? (cliente fez revisão em outro lugar)')">
+                                <input type="hidden" name="tipo" value="DISPENSA_REVISAO">
+                                <input type="hidden" name="veiculo_id" value="{{ r.veiculo_id }}">
+                                <input type="hidden" name="data_rev" value="{{ r.data_rev.strftime('%Y-%m-%d') if r.data_rev else '' }}">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                    Dispensar
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-secondary mb-0">Nenhuma revisão próxima no momento.</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

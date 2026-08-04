@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Vendas Rápidas{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white mb-0">Histórico de Vendas Rápidas</h2>
+        <a href="/venda-rapida" class="btn btn-success">Nova Venda Rápida</a>
+    </div>
+
+    <div class="card-dashboard">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Data</th>
+                        <th>Cliente</th>
+                        <th>Valor Total</th>
+                        <th>Itens</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vendas %}
+                    <tr>
+                        <td>{{ v.id }}</td>
+                        <td>{{ v.data_venda.strftime('%d/%m/%Y %H:%M') if v.data_venda else '-' }}</td>
+                        <td>{{ v.cliente.nome if v.cliente else 'Balcão' }}</td>
+                        <td>R$ {{ "%.2f"|format(v.valor_total or 0) }}</td>
+                        <td>{{ v.itens|length }} item(ns)</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-secondary py-4">Nenhuma venda rápida registrada.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

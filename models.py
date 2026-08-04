@@ -621,7 +621,7 @@ class OrdemServicoMecanico(db.Model):
     ordem_servico_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"), nullable=False)
     mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"), nullable=False)
 
-    descricao_servico = db.Column(db.String(250))  # ← NOVO
+    descricao_servico = db.Column(db.String(250))
 
     duracao_estimada_min = db.Column(db.Integer, default=40)
     valor_mercado = db.Column(db.Float, default=0)
@@ -660,3 +660,62 @@ class Agendamento(db.Model):
 
     mecanico = db.relationship("Mecanico", backref="agendamentos")
     ordem_servico = db.relationship("OrdemServico", backref="agendamentos")
+
+
+# ==========================================================
+# VENDA RÁPIDA (PEÇAS SEM OS)
+# ==========================================================
+
+class VendaRapida(db.Model):
+    __tablename__ = "vendas_rapidas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"), nullable=False, index=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"), nullable=True)
+    data_venda = db.Column(db.DateTime, default=datetime.utcnow)
+    valor_total = db.Column(Numeric(18, 2), default=0)
+    observacoes = db.Column(db.Text)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    empresa = db.relationship("Empresa")
+    cliente = db.relationship("Cliente")
+    usuario = db.relationship("Usuario")
+    itens = db.relationship("ItemVendaRapida", back_populates="venda", cascade="all, delete-orphan")
+
+
+class ItemVendaRapida(db.Model):
+    __tablename__ = "itens_venda_rapida"
+
+    id = db.Column(db.Integer, primary_key=True)
+    venda_id = db.Column(db.Integer, db.ForeignKey("vendas_rapidas.id"), nullable=False)
+    produto_id = db.Column(db.Integer, db.ForeignKey("produtos.id"), nullable=True)
+    descricao = db.Column(db.String(250), nullable=False)
+    quantidade = db.Column(Numeric(18, 3), default=1)
+    valor_unitario = db.Column(Numeric(18, 2), default=0)
+    valor_total = db.Column(Numeric(18, 2), default=0)
+    origem = db.Column(db.String(20), default="ESTOQUE")
+    observacoes = db.Column(db.Text)
+
+    venda = db.relationship("VendaRapida", back_populates="itens")
+    produto = db.relationship("Produto")
+
+
+# ==========================================================
+# LEMBRETES ENVIADOS
+# ==========================================================
+
+class LembreteEnvio(db.Model):
+    __tablename__ = "lembretes_envio"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(20), nullable=False)  # ANIVERSARIO | REVISAO | DISPENSA_REVISAO
+    cliente_id = db.Column(db.Integer, db.ForeignKey("clientes.id"))
+    veiculo_id = db.Column(db.Integer, db.ForeignKey("veiculos.id"))
+    ano = db.Column(db.Integer)
+    quantidade = db.Column(db.Integer, default=1)
+    data_revisao_ref = db.Column(db.Date)
+    enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    cliente = db.relationship("Cliente", backref="lembretes_envio")
+    veiculo = db.relationship("Veiculo", backref="lembretes_envio")
