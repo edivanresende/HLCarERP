@@ -145,8 +145,11 @@
 
             </div>
 
-            <button type="submit" class="btn btn-success">Salvar Alterações</button>
-            <a href="/ordens" class="btn btn-secondary">Cancelar</a>
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-success">Salvar Alterações</button>
+                <a href="/ordens/{{ ordem.id }}/nfse" class="btn btn-info">Emitir NFS-e</a>
+                <a href="/ordens" class="btn btn-secondary">Cancelar</a>
+            </div>
 
         </form>
     </div>

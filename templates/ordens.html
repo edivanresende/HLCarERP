@@ -3,13 +3,15 @@
 {% block conteudo %}
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-
     <h2>Ordens de Serviço</h2>
-
-    <a href="/ordens/nova" class="btn btn-warning">
-        Nova Ordem
-    </a>
-
+    <div class="d-flex gap-2">
+        <a href="/ordens/por-placa" class="btn btn-outline-warning">
+            Abrir por Placa
+        </a>
+        <a href="/ordens/nova" class="btn btn-warning">
+            Nova Ordem
+        </a>
+    </div>
 </div>
 
 <!-- ===== FILTRO DE DATA ===== -->
@@ -89,7 +91,7 @@
                     <th>KM</th>
                     <th>Status</th>
                     <th>Total</th>
-                    <th width="380">Ações</th>
+                    <th width="420">Ações</th>
                 </tr>
             </thead>
 
@@ -116,6 +118,10 @@
                     <td>
                         <a href="/ordens/pdf/{{ ordem.id }}" target="_blank" class="btn btn-outline-light btn-sm" title="Gerar PDF">
                             📄
+                        </a>
+                        <a href="/ordens/{{ ordem.id }}/nfse" class="btn btn-outline-info btn-sm" title="Emitir NFS-e">NF</a>
+                        <a href="/ordens/{{ ordem.id }}/checklist" class="btn btn-outline-warning btn-sm" title="Checklist do Veículo">
+                            Checklist
                         </a>
 
                         {% if ordem.status != "FINALIZADA" %}

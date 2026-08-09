@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Emitir NFS-e - Venda Rápida #{{ venda.id }}{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white mb-0">Emitir NFS-e – Venda Rápida #{{ venda.id }}</h2>
+        <a href="/vendas-rapidas" class="btn btn-secondary">Voltar</a>
+    </div>
+
+    <div class="row">
+        <!-- ===================== DADOS ===================== -->
+        <div class="col-lg-8">
+            <div class="card bg-dark border-0 shadow mb-4">
+                <div class="card-header bg-warning text-dark fw-bold">
+                    Dados da Venda Rápida
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <label class="text-secondary small">Cliente</label>
+                        <div class="form-control bg-dark text-white border-secondary" id="cli-nome">
+                            {{ venda.cliente.nome if venda.cliente else 'Balcão / Consumidor Final' }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-secondary small">CPF / CNPJ</label>
+                        <div class="form-control bg-dark text-white border-secondary" id="cli-doc">
+                            {{ venda.cliente.cpf_cnpj if venda.cliente and venda.cliente.cpf_cnpj else '-' }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-secondary small">Descrição</label>
+                        <div class="form-control bg-dark text-white border-secondary" style="min-height:80px" id="servico">
+                            Venda de peças / produtos automotivos
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="text-secondary small">Valor Total (R$)</label>
+                            <div class="form-control bg-dark text-success border-secondary fw-bold" id="valor">
+                                {{ "%.2f"|format(venda.valor_total or 0) }}
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-secondary small">Data</label>
+                            <div class="form-control bg-dark text-white border-secondary">
+                                {{ venda.data_venda.strftime('%d/%m/%Y') if venda.data_venda else '-' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================== OPÇÕES DE EMISSÃO ===================== -->
+        <div class="col-lg-4">
+
+            <!-- OPÇÃO 1 - MANUAL -->
+            <div class="card bg-dark border-0 shadow mb-4">
+                <div class="card-header bg-success text-white fw-bold">
+                    Opção 1 – Manual (recomendado)
+                </div>
+                <div class="card-body">
+                    <p class="text-secondary small mb-3">
+                        Copia os dados e abre o site da prefeitura. Funciona em qualquer cidade.
+                    </p>
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-light" onclick="copiarTudo()">
+                            📋 Copiar todos os dados
+                        </button>
+
+                        {% if empresa and empresa.url_nfse %}
+                        <button class="btn btn-warning" onclick="abrirSite()">
+                            🔗 Abrir site da prefeitura
+                        </button>
+                        {% else %}
+                        <button class="btn btn-secondary" disabled>
+                            🔗 Link não configurado
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- OPÇÃO 2 - AUTOMÁTICA (futura) -->
+            <div class="card bg-dark border-0 shadow">
+                <div class="card-header bg-info text-white fw-bold">
+                    Opção 2 – Automática
+                </div>
+                <div class="card-body">
+                    <p class="text-secondary small mb-3">
+                        Emite a NFS-e direto do sistema (sem copiar e colar).
+                    </p>
+
+                    <button class="btn btn-secondary w-100" disabled title="Configure o certificado digital e o provedor nas Configurações">
+                        ⚡ Emitir NFS-e Automaticamente
+                    </button>
+
+                    <div class="mt-3 small text-secondary">
+                        <i class="fa fa-info-circle"></i> 
+                        Para ativar esta opção, a empresa precisa ter:
+                        <ul class="mb-0 mt-1">
+                            <li>Certificado Digital A1</li>
+                            <li>Provedor configurado</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+function copiarTudo() {
+    const texto = 
+        "Cliente: " + document.getElementById('cli-nome').innerText + "\n" +
+        "CPF/CNPJ: " + document.getElementById('cli-doc').innerText + "\n" +
+        "Descrição: " + document.getElementById('servico').innerText + "\n" +
+        "Valor: R$ " + document.getElementById('valor').innerText;
+
+    navigator.clipboard.writeText(texto).then(() => {
+        alert("Dados copiados!");
+    });
+}
+
+function abrirSite() {
+    const texto = 
+        "Cliente: " + document.getElementById('cli-nome').innerText + "\n" +
+        "CPF/CNPJ: " + document.getElementById('cli-doc').innerText + "\n" +
+        "Descrição: " + document.getElementById('servico').innerText + "\n" +
+        "Valor: R$ " + document.getElementById('valor').innerText;
+
+    navigator.clipboard.writeText(texto).then(() => {
+        window.open("{{ empresa.url_nfse }}", "_blank");
+        alert("Dados copiados! Agora cole no site (Ctrl+V).");
+    });
+}
+</script>
+{% endblock %}

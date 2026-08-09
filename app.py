@@ -39,6 +39,7 @@ from models import (
     VendaRapida,
     ItemVendaRapida,
     LembreteEnvio,
+    ChecklistVeiculo,
 )
 
 from pdf_ordem_old import gerar_pdf_ordem
@@ -132,6 +133,14 @@ def corrigir_colunas_banco():
             "whatsapp": "VARCHAR(30)",
             "email": "VARCHAR(150)",
             "site": "VARCHAR(200)",
+            "url_nfse": "VARCHAR(255)",
+            "nfse_provedor": "VARCHAR(50)",
+            "inscricao_municipal": "VARCHAR(30)",
+            "certificado_path": "VARCHAR(255)",
+            "senha_certificado": "VARCHAR(100)",
+            "codigo_servico": "VARCHAR(20)",
+            "aliquota_iss": "NUMERIC(5,2)",
+            "regime_tributario": "VARCHAR(10)",
             "cep": "VARCHAR(15)",
             "endereco": "VARCHAR(200)",
             "numero": "VARCHAR(20)",
@@ -207,6 +216,33 @@ def corrigir_colunas_banco():
                         print(f"✅ itens_ordem_servico.{coluna} adicionada")
         except Exception as e:
             print("Erro ao verificar itens_ordem_servico:", e)
+                    # ========== CHECKLIST_VEICULO ==========
+        try:
+            result = db.session.execute(text("PRAGMA table_info(checklist_veiculo)")).fetchall()
+            colunas = [row[1] for row in result]
+            if "assinatura" not in colunas:
+                db.session.execute(text("ALTER TABLE checklist_veiculo ADD COLUMN assinatura TEXT"))
+                print("✅ checklist_veiculo.assinatura adicionada")
+        except Exception as e:
+            print("Erro checklist_veiculo:", e)
+                    # ========== ITENS_VENDA_RAPIDA ==========
+        try:
+            result = db.session.execute(text("PRAGMA table_info(itens_venda_rapida)")).fetchall()
+            colunas = [row[1] for row in result]
+            if "custo_unitario" not in colunas:
+                db.session.execute(text("ALTER TABLE itens_venda_rapida ADD COLUMN custo_unitario NUMERIC(18,2) DEFAULT 0"))
+                print("✅ itens_venda_rapida.custo_unitario adicionada")
+        except Exception as e:
+            print("Erro itens_venda_rapida:", e)
+                    # ========== MECANICOS ==========
+        try:
+            result = db.session.execute(text("PRAGMA table_info(mecanicos)")).fetchall()
+            colunas = [row[1] for row in result]
+            if "tipo" not in colunas:
+                db.session.execute(text("ALTER TABLE mecanicos ADD COLUMN tipo VARCHAR(20) DEFAULT 'FUNCIONARIO'"))
+                print("✅ mecanicos.tipo adicionada")
+        except Exception as e:
+            print("Erro mecanicos:", e)
 
 
         db.session.commit()
@@ -259,6 +295,7 @@ def logout():
 @app.route("/")
 @login_required
 def dashboard():
+    from sqlalchemy import func
     periodo = request.args.get("periodo")
     data_inicio = request.args.get("data_inicio")
     data_fim = request.args.get("data_fim")
@@ -413,6 +450,55 @@ def dashboard():
         revisoes = revisoes[:6]
     except Exception:
         revisoes = []
+    # ========== LUCRO DAS PEÇAS ==========
+    try:
+        lucro_pecas_os = 0.0
+        lucro_pecas_venda = 0.0
+
+        # --- Lucro OS ---
+        query_itens_os = db.session.query(ItemOrdemServico).join(OrdemServico)
+        if periodo == "hoje":
+            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) == hoje)
+        elif periodo == "semana":
+            inicio_semana = hoje - timedelta(days=hoje.weekday())
+            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) >= inicio_semana)
+        elif periodo == "mes":
+            inicio_mes = hoje.replace(day=1)
+            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) >= inicio_mes)
+        elif periodo == "ano":
+            inicio_ano = hoje.replace(month=1, day=1)
+            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) >= inicio_ano)
+
+        for item in query_itens_os.all():
+            venda = float(item.valor_total or 0)
+            custo = float(item.custo_unitario or 0) * float(item.quantidade or 0)
+            lucro_pecas_os += (venda - custo)
+
+        # --- Lucro Venda Rápida ---
+        query_vr = db.session.query(ItemVendaRapida).join(VendaRapida)
+        if periodo == "hoje":
+            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) == hoje)
+        elif periodo == "semana":
+            inicio_semana = hoje - timedelta(days=hoje.weekday())
+            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) >= inicio_semana)
+        elif periodo == "mes":
+            inicio_mes = hoje.replace(day=1)
+            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) >= inicio_mes)
+        elif periodo == "ano":
+            inicio_ano = hoje.replace(month=1, day=1)
+            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) >= inicio_ano)
+
+        for item in query_vr.all():
+            venda = float(item.valor_total or 0)
+            custo = float(item.custo_unitario or 0) * float(item.quantidade or 0)
+            lucro_pecas_venda += (venda - custo)
+
+        lucro_pecas_total = lucro_pecas_os + lucro_pecas_venda
+    except Exception as e:
+        print("Erro lucro peças:", e)
+        lucro_pecas_os = 0
+        lucro_pecas_venda = 0
+        lucro_pecas_total = 0
 
     return render_template(
         "dashboard.html",
@@ -436,6 +522,9 @@ def dashboard():
         ticket_medio=ticket_medio,
         os_antigas=os_antigas,
         revisoes=revisoes,
+        lucro_pecas_total=lucro_pecas_total,
+        lucro_pecas_os=lucro_pecas_os,
+        lucro_pecas_venda=lucro_pecas_venda,
     )
 
 
@@ -639,6 +728,93 @@ def ordens():
         data_fim=data_fim,
         status=status
     )
+@app.route("/ordens/por-placa", methods=["GET", "POST"])
+@login_required
+def ordens_por_placa():
+    # Quando vem da foto (query string)
+    placa_query = request.args.get("placa")
+    if placa_query:
+        placa = placa_query.strip().upper().replace("-", "").replace(" ", "")
+        veiculo = Veiculo.query.filter(Veiculo.placa == placa).first()
+        if veiculo:
+            return redirect(f"/ordens/nova?cliente_id={veiculo.cliente_id}&veiculo_id={veiculo.id}")
+        else:
+            return render_template(
+                "ordens_por_placa.html",
+                mensagem=f"Nenhum veículo encontrado com a placa <strong>{placa}</strong>.",
+                tipo_alerta="danger",
+                mostrar_botao_cadastro=True,
+                placa_digitada=placa
+            )
+
+    if request.method == "GET":
+        return render_template("ordens_por_placa.html")
+
+    # Quando digita a placa manualmente
+    placa = (request.form.get("placa") or "").strip().upper().replace("-", "").replace(" ", "")
+    
+    if not placa or len(placa) < 7:
+        return render_template(
+            "ordens_por_placa.html",
+            mensagem="Digite uma placa válida (mínimo 7 caracteres).",
+            tipo_alerta="warning",
+            placa_digitada=placa
+        )
+
+    veiculo = Veiculo.query.filter(Veiculo.placa == placa).first()
+
+    if veiculo:
+        return redirect(f"/ordens/nova?cliente_id={veiculo.cliente_id}&veiculo_id={veiculo.id}")
+    else:
+        return render_template(
+            "ordens_por_placa.html",
+            mensagem=f"Nenhum veículo encontrado com a placa <strong>{placa}</strong>.",
+            tipo_alerta="danger",
+            mostrar_botao_cadastro=True,
+            placa_digitada=placa
+        )
+
+
+@app.route("/api/ler-placa", methods=["POST"])
+@login_required
+def api_ler_placa():
+    if "foto" not in request.files:
+        return jsonify({"sucesso": False, "mensagem": "Nenhuma foto enviada"})
+
+    foto = request.files["foto"]
+    if foto.filename == "":
+        return jsonify({"sucesso": False, "mensagem": "Arquivo inválido"})
+
+    try:
+        import easyocr
+        import numpy as np
+        from PIL import Image
+        import io
+
+        img = Image.open(io.BytesIO(foto.read()))
+        img_np = np.array(img)
+
+        reader = easyocr.Reader(['pt', 'en'], gpu=False)
+        results = reader.readtext(img_np)
+
+        placa = ""
+        for (bbox, texto, conf) in results:
+            texto_limpo = texto.replace(" ", "").replace("-", "").upper()
+            if conf > 0.35 and 7 <= len(texto_limpo) <= 8:
+                placa = texto_limpo[:7]
+                break
+
+        if not placa:
+            return jsonify({
+                "sucesso": False, 
+                "mensagem": "Não foi possível identificar a placa. Tente uma foto mais nítida e centralizada."
+            })
+
+        return jsonify({"sucesso": True, "placa": placa})
+
+    except Exception as e:
+        print("Erro OCR:", e)
+        return jsonify({"sucesso": False, "mensagem": f"Erro ao processar imagem: {str(e)}"})
 
 
 @app.route("/ordens/nova", methods=["GET", "POST"])
@@ -653,6 +829,7 @@ def nova_ordem():
         horas_list = request.form.getlist("servico_horas")
         minutos_list = request.form.getlist("servico_minutos")
         vals = request.form.getlist("servico_valor")
+        comissoes = request.form.getlist("servico_comissao")
 
         nomes = []
         total_servicos = 0.0
@@ -673,6 +850,12 @@ def nova_ordem():
                 if dur < 5:
                     dur = 40
                 val = float(vals[i]) if i < len(vals) and vals[i] else 0
+
+                try:
+                    perc_form = float(comissoes[i]) if i < len(comissoes) and comissoes[i] else None
+                except Exception:
+                    perc_form = None
+
                 nomes.append(m.nome)
                 total_servicos += val
                 detalhes.append({
@@ -680,6 +863,7 @@ def nova_ordem():
                     "duracao": dur,
                     "valor": val,
                     "servico": serv,
+                    "comissao": perc_form if perc_form is not None else float(m.percentual_comissao or 20),
                 })
             except Exception:
                 pass
@@ -891,6 +1075,7 @@ def editar_ordem(id):
         horas_list = request.form.getlist("servico_horas")
         minutos_list = request.form.getlist("servico_minutos")
         vals = request.form.getlist("servico_valor")
+        comissoes = request.form.getlist("servico_comissao")
 
         nomes = []
         total_servicos = 0.0
@@ -911,6 +1096,12 @@ def editar_ordem(id):
                 if dur < 5:
                     dur = 40
                 val = float(vals[i]) if i < len(vals) and vals[i] else 0
+
+                try:
+                    perc_form = float(comissoes[i]) if i < len(comissoes) and comissoes[i] else None
+                except Exception:
+                    perc_form = None
+
                 nomes.append(m.nome)
                 total_servicos += val
                 detalhes.append({
@@ -918,6 +1109,7 @@ def editar_ordem(id):
                     "duracao": dur,
                     "valor": val,
                     "servico": serv,
+                    "comissao": perc_form if perc_form is not None else float(m.percentual_comissao or 20),
                 })
             except Exception:
                 pass
@@ -1777,7 +1969,6 @@ def excluir_usuario(id):
 def configuracoes():
     empresa = Empresa.query.first()
     usuario = Usuario.query.get(session.get("usuario_id"))
-
     mensagem = None
     erro = None
 
@@ -1805,6 +1996,7 @@ def configuracoes():
                 empresa.bairro = request.form.get("bairro")
                 empresa.cidade = request.form.get("cidade")
                 empresa.estado = request.form.get("estado")
+                empresa.url_nfse = request.form.get("url_nfse") or None
 
                 db.session.commit()
                 mensagem = "Dados da empresa salvos com sucesso!"
@@ -1827,6 +2019,38 @@ def configuracoes():
                 usuario.senha = generate_password_hash(nova_senha)
                 db.session.commit()
                 mensagem = "Senha alterada com sucesso!"
+
+        elif acao == "nfse":
+            try:
+                if not empresa:
+                    erro = "Empresa não encontrada"
+                else:
+                    empresa.nfse_provedor = request.form.get("nfse_provedor") or None
+                    empresa.inscricao_municipal = request.form.get("inscricao_municipal") or None
+                    empresa.codigo_servico = request.form.get("codigo_servico") or None
+                    empresa.aliquota_iss = request.form.get("aliquota_iss") or 5.00
+                    empresa.regime_tributario = request.form.get("regime_tributario") or "1"
+
+                    senha = request.form.get("senha_certificado")
+                    if senha:
+                        empresa.senha_certificado = senha
+
+                    if "certificado" in request.files:
+                        arquivo = request.files["certificado"]
+                        if arquivo and arquivo.filename:
+                            import os
+                            pasta = os.path.join("uploads", "certificados")
+                            os.makedirs(pasta, exist_ok=True)
+                            nome_arquivo = f"certificado_{empresa.id}.pfx"
+                            caminho = os.path.join(pasta, nome_arquivo)
+                            arquivo.save(caminho)
+                            empresa.certificado_path = caminho
+
+                    db.session.commit()
+                    mensagem = "Configurações de NFS-e salvas com sucesso!"
+            except Exception as e:
+                db.session.rollback()
+                erro = f"Erro ao salvar NFS-e: {str(e)}"
 
     return render_template(
         "configuracoes.html",
@@ -1856,6 +2080,7 @@ def novo_mecanico():
                 nome=request.form.get("nome"),
                 telefone=request.form.get("telefone"),
                 whatsapp=request.form.get("whatsapp"),
+                tipo=request.form.get("tipo") or "FUNCIONARIO",
                 ativo=True if request.form.get("ativo") == "on" else False,
                 forma_pagamento=request.form.get("forma_pagamento") or "comissao",
                 salario=float(request.form.get("salario") or 0),
@@ -1884,6 +2109,7 @@ def editar_mecanico(id):
             mecanico.nome = request.form.get("nome")
             mecanico.telefone = request.form.get("telefone")
             mecanico.whatsapp = request.form.get("whatsapp")
+            mecanico.tipo = request.form.get("tipo") or "FUNCIONARIO"
             mecanico.ativo = True if request.form.get("ativo") == "on" else False
             mecanico.forma_pagamento = request.form.get("forma_pagamento") or "comissao"
             mecanico.salario = float(request.form.get("salario") or 0)
@@ -2215,11 +2441,27 @@ def venda_rapida():
                     if qtd <= 0:
                         continue
 
+                      # Busca o custo (sempre pega do formulário primeiro)
+                    custo = 0.0
+                    custos = request.form.getlist("custo_unitario[]")
+                    if i < len(custos):
+                        try:
+                            custo = float(custos[i] or 0)
+                        except:
+                            custo = 0.0
+
+                    # Se não veio do formulário e for estoque, pega do produto
+                    if custo == 0 and origem == "ESTOQUE" and pid > 0:
+                        produto_custo = Produto.query.get(pid)
+                        if produto_custo:
+                            custo = float(produto_custo.preco_compra or 0)
+
                     item = ItemVendaRapida(
                         venda_id=venda.id,
                         produto_id=pid if pid > 0 else None,
                         descricao=desc,
                         quantidade=qtd,
+                        custo_unitario=custo,
                         valor_unitario=valor,
                         valor_total=qtd * valor,
                         origem=origem
@@ -2238,6 +2480,7 @@ def venda_rapida():
                             mov = MovimentacaoEstoque(
                                 empresa_id=session.get("empresa_id") or 1,
                                 produto_id=pid,
+                                tipo="SAIDA",
                                 tipo_movimento="SAIDA",
                                 origem="VENDA_RAPIDA",
                                 quantidade=qtd,
@@ -2509,5 +2752,227 @@ def inject_lembretes_pendentes():
         return {"lembretes_pendentes": pendentes}
     except Exception:
         return {"lembretes_pendentes": 0}
+@app.route("/ordens/<int:id>/nfse")
+@login_required
+def ordem_nfse(id):
+    ordem = OrdemServico.query.get_or_404(id)
+    empresa = Empresa.query.first()
+    return render_template("ordem_nfse.html", ordem=ordem, empresa=empresa)
+@app.route("/vendas-rapidas/<int:id>/nfse")
+@login_required
+def venda_rapida_nfse(id):
+    venda = VendaRapida.query.get_or_404(id)
+    empresa = Empresa.query.first()
+    return render_template("venda_rapida_nfse.html", venda=venda, empresa=empresa)
+# ============================================================
+# CHECKLIST DO VEÍCULO
+# ============================================================
+
+@app.route("/uploads/<path:filename>")
+def uploaded_file(filename):
+    from flask import send_from_directory
+    import os
+    return send_from_directory(os.path.join(app.root_path, "uploads"), filename)
+
+@app.route("/ordens/<int:id>/checklist", methods=["GET", "POST"])
+@login_required
+def checklist_veiculo(id):
+    ordem = OrdemServico.query.get_or_404(id)
+    checklist = ChecklistVeiculo.query.filter_by(ordem_servico_id=id).first()
+
+    if request.method == "POST":
+        try:
+            if not checklist:
+                checklist = ChecklistVeiculo(ordem_servico_id=id)
+                db.session.add(checklist)
+
+            # Itens do checklist
+            itens = [
+                "farois", "lanternas", "setas", "pneus", "lataria",
+                "para_choques", "vidros", "retrovisores", "interior",
+                "bancos", "painel", "tapetes", "estepe", "macaco",
+                "triangulo", "documentos", "chave_reserva"
+            ]
+            for item in itens:
+                setattr(checklist, item, request.form.get(item) or "OK")
+
+            checklist.observacoes = request.form.get("observacoes")
+            checklist.assinatura = request.form.get("assinatura") or checklist.assinatura
+
+            # Upload de fotos
+            fotos_salvas = []
+            if checklist.fotos:
+                fotos_salvas = checklist.fotos.split(",")
+
+            if "fotos" in request.files:
+                arquivos = request.files.getlist("fotos")
+                import os
+                pasta = os.path.join("uploads", "checklist", str(id))
+                os.makedirs(pasta, exist_ok=True)
+
+                for arquivo in arquivos:
+                    if arquivo and arquivo.filename:
+                        nome = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{arquivo.filename}"
+                        caminho = os.path.join(pasta, nome)
+                        arquivo.save(caminho)
+                        fotos_salvas.append(caminho)
+
+            checklist.fotos = ",".join(fotos_salvas) if fotos_salvas else None
+
+            db.session.commit()
+            return redirect(f"/ordens/{id}/checklist?sucesso=1")
+        except Exception as e:
+            db.session.rollback()
+            print("Erro checklist:", e)
+
+    return render_template(
+        "checklist_veiculo.html",
+        ordem=ordem,
+        checklist=checklist
+    )
+@app.route("/ordens/<int:id>/checklist/pdf")
+@login_required
+def checklist_pdf(id):
+    from flask import make_response
+    ordem = OrdemServico.query.get_or_404(id)
+    checklist = ChecklistVeiculo.query.filter_by(ordem_servico_id=id).first()
+    empresa = Empresa.query.first()
+
+    if not checklist:
+        return "Checklist ainda não foi preenchido", 404
+
+    # Monta as fotos organizadas
+    fotos_html = ""
+    if checklist.fotos:
+        labels = ["Frente", "Traseira", "Lateral Esquerda", "Lateral Direita", "Painel / Interior"]
+        fotos = [f.strip() for f in checklist.fotos.split(",") if f.strip()]
+        
+        fotos_html += '<div style="display:flex; flex-wrap:wrap; gap:15px; margin-top:10px;">'
+        for i, foto in enumerate(fotos):
+            label = labels[i] if i < len(labels) else f"Foto {i+1}"
+            fotos_html += f'''
+                <div style="text-align:center;">
+                    <div style="font-size:12px; font-weight:bold; margin-bottom:4px;">{label}</div>
+                    <img src="/{foto}" style="width:180px; height:130px; object-fit:cover; border:1px solid #999;">
+                </div>
+            '''
+        fotos_html += '</div>'
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Checklist de Entrada - OS {ordem.numero}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; font-size: 13px; margin: 30px; color: #222; }}
+            h1 {{ font-size: 20px; margin-bottom: 5px; color: #111; }}
+            .header {{ border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }}
+            .info {{ line-height: 1.6; margin-bottom: 20px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+            th, td {{ border: 1px solid #444; padding: 7px 10px; text-align: left; }}
+            th {{ background: #f0f0f0; }}
+            .obs {{ margin-top: 25px; padding: 12px; background: #f9f9f9; border: 1px solid #ddd; }}
+            .fotos {{ margin-top: 25px; }}
+            .assinatura {{ margin-top: 50px; }}
+            .linha {{ border-top: 1px solid #333; width: 280px; margin-top: 40px; }}
+        </style>
+    </head>
+    <body>
+        <div class="header" style="display:flex; align-items:center; gap:20px;">
+            {f'<img src="/{empresa.logo}" style="height:60px; max-width:120px; object-fit:contain;">' if empresa and empresa.logo else ''}
+            <div>
+                <h1 style="margin:0;">Checklist de Entrada do Veículo</h1>
+                <div style="font-size:14px;"><strong>{empresa.nome_fantasia if empresa else 'HL Car Auto Center'}</strong></div>
+                <div style="font-size:12px; color:#555;">{empresa.telefone if empresa and empresa.telefone else ''} {(' | ' + empresa.cidade) if empresa and empresa.cidade else ''}</div>
+            </div>
+        </div>
+
+        <div class="info">
+            <strong>OS nº:</strong> {ordem.numero}<br>
+            <strong>Cliente:</strong> {ordem.cliente.nome if ordem.cliente else '-'}<br>
+            <strong>Veículo:</strong> {ordem.veiculo.placa if ordem.veiculo else '-'} - {ordem.veiculo.marca if ordem.veiculo else ''} {ordem.veiculo.modelo if ordem.veiculo else ''}<br>
+            <strong>Data do Checklist:</strong> {checklist.criado_em.strftime('%d/%m/%Y %H:%M') if checklist.criado_em else '-'}
+        </div>
+
+        <table>
+            <tr>
+                <th width="60%">Item</th>
+                <th>Estado</th>
+            </tr>
+    """
+
+    itens = [
+        ("Faróis", checklist.farois),
+        ("Lanternas", checklist.lanternas),
+        ("Setas", checklist.setas),
+        ("Pneus", checklist.pneus),
+        ("Lataria", checklist.lataria),
+        ("Para-choques", checklist.para_choques),
+        ("Vidros", checklist.vidros),
+        ("Retrovisores", checklist.retrovisores),
+        ("Interior", checklist.interior),
+        ("Bancos", checklist.bancos),
+        ("Painel", checklist.painel),
+        ("Tapetes", checklist.tapetes),
+        ("Estepe", checklist.estepe),
+        ("Macaco", checklist.macaco),
+        ("Triângulo", checklist.triangulo),
+        ("Documentos", checklist.documentos),
+        ("Chave Reserva", checklist.chave_reserva),
+    ]
+
+    for nome, valor in itens:
+        html += f"<tr><td>{nome}</td><td><strong>{valor or 'OK'}</strong></td></tr>"
+
+    html += f"""
+        </table>
+
+        <div class="obs">
+            <strong>Observações / Avarias encontradas:</strong><br><br>
+            {checklist.observacoes or 'Nenhuma observação registrada.'}
+        </div>
+    """
+
+    if fotos_html:
+        html += f"""
+        <div class="fotos">
+            <strong>Fotos do veículo na entrada:</strong><br>
+            {fotos_html}
+        </div>
+        """
+
+    assinatura_html = ""
+    if checklist.assinatura:
+        assinatura_html = f'''
+            <div style="margin-top:30px;">
+                <strong>Assinatura do Cliente:</strong><br>
+                <img src="{checklist.assinatura}" style="max-width:300px; border:1px solid #ccc; background:#fff;">
+            </div>
+        '''
+    else:
+        assinatura_html = '''
+            <div class="assinatura">
+                <div class="linha"></div>
+                <p>Assinatura do Cliente / Responsável</p>
+            </div>
+        '''
+
+    html += f"""
+        {assinatura_html}
+    </body>
+    </html>
+    """
+
+    # Tenta gerar PDF de verdade, se não tiver weasyprint mostra HTML para imprimir
+    try:
+        from weasyprint import HTML
+        pdf = HTML(string=html, base_url=request.host_url).write_pdf()
+        response = make_response(pdf)
+        response.headers["Content-Type"] = "application/pdf"
+        response.headers["Content-Disposition"] = f"inline; filename=checklist_os_{ordem.numero}.pdf"
+        return response
+    except Exception:
+        return html
 if __name__ == "__main__":
     app.run(debug=True)

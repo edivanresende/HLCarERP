@@ -21,6 +21,16 @@ class Empresa(db.Model):
     whatsapp = db.Column(db.String(30))
     email = db.Column(db.String(150))
     site = db.Column(db.String(200))
+
+    url_nfse = db.Column(db.String(255))
+    # Campos para NFS-e Automática
+    nfse_provedor = db.Column(db.String(50))
+    inscricao_municipal = db.Column(db.String(30))
+    certificado_path = db.Column(db.String(255))
+    senha_certificado = db.Column(db.String(100))
+    codigo_servico = db.Column(db.String(20))
+    aliquota_iss = db.Column(db.Numeric(5, 2), default=5.00)
+    regime_tributario = db.Column(db.String(10), default="1")
     cep = db.Column(db.String(15))
     endereco = db.Column(db.String(200))
     numero = db.Column(db.String(20))
@@ -597,6 +607,10 @@ class Mecanico(db.Model):
     whatsapp = db.Column(db.String(20))
     ativo = db.Column(db.Boolean, default=True)
 
+    # FUNCIONARIO = salário + comissão padrão
+    # PARCEIRO = comissão negociada por serviço
+    tipo = db.Column(db.String(20), default="FUNCIONARIO")
+
     forma_pagamento = db.Column(db.String(30), default="comissao")
     salario = db.Column(db.Float, default=0)
     percentual_comissao = db.Column(db.Float, default=20)
@@ -692,6 +706,7 @@ class ItemVendaRapida(db.Model):
     produto_id = db.Column(db.Integer, db.ForeignKey("produtos.id"), nullable=True)
     descricao = db.Column(db.String(250), nullable=False)
     quantidade = db.Column(Numeric(18, 3), default=1)
+    custo_unitario = db.Column(Numeric(18, 2), default=0)
     valor_unitario = db.Column(Numeric(18, 2), default=0)
     valor_total = db.Column(Numeric(18, 2), default=0)
     origem = db.Column(db.String(20), default="ESTOQUE")
@@ -719,3 +734,42 @@ class LembreteEnvio(db.Model):
 
     cliente = db.relationship("Cliente", backref="lembretes_envio")
     veiculo = db.relationship("Veiculo", backref="lembretes_envio")
+
+
+# ==========================================================
+# CHECKLIST DO VEÍCULO
+# ==========================================================
+
+class ChecklistVeiculo(db.Model):
+    __tablename__ = "checklist_veiculo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    ordem_servico_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"), nullable=False)
+    
+    # Itens do checklist
+    farois = db.Column(db.String(20), default="OK")          # OK | DANIFICADO | NAO_VERIFICADO
+    lanternas = db.Column(db.String(20), default="OK")
+    setas = db.Column(db.String(20), default="OK")
+    pneus = db.Column(db.String(20), default="OK")
+    lataria = db.Column(db.String(20), default="OK")
+    para_choques = db.Column(db.String(20), default="OK")
+    vidros = db.Column(db.String(20), default="OK")
+    retrovisores = db.Column(db.String(20), default="OK")
+    interior = db.Column(db.String(20), default="OK")
+    bancos = db.Column(db.String(20), default="OK")
+    painel = db.Column(db.String(20), default="OK")
+    tapetes = db.Column(db.String(20), default="OK")
+    estepe = db.Column(db.String(20), default="OK")
+    macaco = db.Column(db.String(20), default="OK")
+    triangulo = db.Column(db.String(20), default="OK")
+    documentos = db.Column(db.String(20), default="OK")
+    chave_reserva = db.Column(db.String(20), default="OK")
+    assinatura = db.Column(db.Text)
+    
+    observacoes = db.Column(db.Text)
+    fotos = db.Column(db.Text)  # caminhos das fotos separados por vírgula
+    
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    alterado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    ordem_servico = db.relationship("OrdemServico", backref="checklist")

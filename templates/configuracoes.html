@@ -18,30 +18,30 @@
 
         <!-- ===================== DADOS DA EMPRESA ===================== -->
         <div class="col-lg-8">
-            <div class="card bg-dark border-0 shadow">
+            <div class="card bg-dark border-0 shadow mb-4">
                 <div class="card-header bg-transparent border-secondary">
                     <h5 class="text-white mb-0"><i class="fa fa-building"></i> Dados da Empresa</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="acao" value="empresa">
 
                         <div class="row g-3">
                             <div class="col-md-8">
                                 <label class="form-label text-secondary">Razão Social</label>
                                 <input type="text" name="razao_social" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.razao_social if empresa else 'HL CAR AUTO CENTER EDIVAN DE SOUZA RESENDE LTDA' }}">
+                                       value="{{ empresa.razao_social if empresa else '' }}">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-secondary">CNPJ</label>
                                 <input type="text" name="cnpj" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.cnpj if empresa else '61.752.233/0001-04' }}">
+                                       value="{{ empresa.cnpj if empresa else '' }}">
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label text-secondary">Nome Fantasia</label>
                                 <input type="text" name="nome_fantasia" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.nome_fantasia if empresa else 'HL CAR AUTO CENTER' }}">
+                                       value="{{ empresa.nome_fantasia if empresa else '' }}">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-secondary">Inscrição Estadual</label>
@@ -52,17 +52,17 @@
                             <div class="col-md-4">
                                 <label class="form-label text-secondary">Telefone</label>
                                 <input type="text" name="telefone" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.telefone if empresa else '(94) 9863-3585' }}">
+                                       value="{{ empresa.telefone if empresa else '' }}">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-secondary">WhatsApp</label>
                                 <input type="text" name="whatsapp" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.whatsapp if empresa else '(94) 9863-3585' }}">
+                                       value="{{ empresa.whatsapp if empresa else '' }}">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-secondary">E-mail</label>
                                 <input type="email" name="email" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.email if empresa else 'EDIVAN.RESENDE1@GMAIL.COM' }}">
+                                       value="{{ empresa.email if empresa else '' }}">
                             </div>
 
                             <div class="col-md-12">
@@ -71,41 +71,49 @@
                                        value="{{ empresa.site if empresa else '' }}">
                             </div>
 
+                            <div class="col-md-12">
+                                <label class="form-label text-secondary">Link de emissão de NFS-e (Opção Manual)</label>
+                                <input type="text" name="url_nfse" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.url_nfse if empresa and empresa.url_nfse else '' }}"
+                                       placeholder="Ex: https://www.nfse.gov.br/EmissorNacional/">
+                                <small class="text-secondary">Usado na Opção 1 (Manual)</small>
+                            </div>
+
                             <div class="col-md-3">
                                 <label class="form-label text-secondary">CEP</label>
                                 <input type="text" name="cep" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.cep if empresa else '68.515-000' }}">
+                                       value="{{ empresa.cep if empresa else '' }}">
                             </div>
                             <div class="col-md-7">
                                 <label class="form-label text-secondary">Endereço</label>
                                 <input type="text" name="endereco" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.endereco if empresa else 'AV SONIA CORTES' }}">
+                                       value="{{ empresa.endereco if empresa else '' }}">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label text-secondary">Número</label>
                                 <input type="text" name="numero" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.numero if empresa else 'S/N' }}">
+                                       value="{{ empresa.numero if empresa else '' }}">
                             </div>
 
                             <div class="col-md-4">
                                 <label class="form-label text-secondary">Complemento</label>
                                 <input type="text" name="complemento" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.complemento if empresa else 'QUADRA 1 LOTE 19' }}">
+                                       value="{{ empresa.complemento if empresa else '' }}">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-secondary">Bairro</label>
                                 <input type="text" name="bairro" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.bairro if empresa else 'BEIRA RIO' }}">
+                                       value="{{ empresa.bairro if empresa else '' }}">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label text-secondary">Cidade</label>
                                 <input type="text" name="cidade" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.cidade if empresa else 'PARAUAPEBAS' }}">
+                                       value="{{ empresa.cidade if empresa else '' }}">
                             </div>
                             <div class="col-md-1">
                                 <label class="form-label text-secondary">UF</label>
                                 <input type="text" name="estado" class="form-control bg-dark text-white border-secondary"
-                                       value="{{ empresa.estado if empresa else 'PA' }}" maxlength="2">
+                                       value="{{ empresa.estado if empresa else '' }}" maxlength="2">
                             </div>
                         </div>
 
@@ -117,12 +125,88 @@
                     </form>
                 </div>
             </div>
+
+            <!-- ===================== NFS-e AUTOMÁTICA ===================== -->
+            <div class="card bg-dark border-0 shadow">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fa fa-file-invoice"></i> NFS-e Automática (Opção 2)</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="acao" value="nfse">
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary">Provedor de NFS-e</label>
+                                <select name="nfse_provedor" class="form-select bg-dark text-white border-secondary">
+                                    <option value="">-- Selecione --</option>
+                                    <option value="focus">Focus NFe</option>
+                                    <option value="enotas">eNotas</option>
+                                    <option value="tecnospeed">Tecnospeed</option>
+                                    <option value="nfeio">NFe.io</option>
+                                    <option value="nacional">Portal Nacional</option>
+                                    <option value="outro">Outro</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary">Inscrição Municipal</label>
+                                <input type="text" name="inscricao_municipal" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.inscricao_municipal if empresa and empresa.inscricao_municipal else '' }}">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary">Certificado Digital A1 (.pfx)</label>
+                                <input type="file" name="certificado" accept=".pfx,.p12" class="form-control bg-dark text-white border-secondary">
+                                <small class="text-secondary">Arquivo .pfx ou .p12</small>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary">Senha do Certificado</label>
+                                <input type="password" name="senha_certificado" class="form-control bg-dark text-white border-secondary"
+                                       placeholder="Senha do arquivo .pfx">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">Código do Serviço (LC 116)</label>
+                                <input type="text" name="codigo_servico" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.codigo_servico if empresa and empresa.codigo_servico else '14.01' }}"
+                                       placeholder="Ex: 14.01">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">Alíquota ISS (%)</label>
+                                <input type="number" step="0.01" name="aliquota_iss" class="form-control bg-dark text-white border-secondary"
+                                       value="{{ empresa.aliquota_iss if empresa and empresa.aliquota_iss else '5.00' }}">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary">Regime Tributário</label>
+                                <select name="regime_tributario" class="form-select bg-dark text-white border-secondary">
+                                    <option value="1">Simples Nacional</option>
+                                    <option value="2">Lucro Presumido</option>
+                                    <option value="3">Lucro Real</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-info">
+                                <i class="fa fa-save"></i> Salvar Configurações de NFS-e
+                            </button>
+                        </div>
+
+                        <div class="alert alert-secondary mt-3 mb-0 small">
+                            <strong>Importante:</strong> A emissão automática só funcionará depois que o certificado e o provedor estiverem corretamente configurados. Enquanto isso, use a Opção 1 (Manual).
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <!-- ===================== ALTERAR SENHA + SISTEMA ===================== -->
         <div class="col-lg-4">
 
-            <!-- Alterar Senha -->
             <div class="card bg-dark border-0 shadow mb-4">
                 <div class="card-header bg-transparent border-secondary">
                     <h5 class="text-white mb-0"><i class="fa fa-key"></i> Alterar Senha</h5>
@@ -151,7 +235,6 @@
                 </div>
             </div>
 
-            <!-- Informações do Sistema -->
             <div class="card bg-dark border-0 shadow">
                 <div class="card-header bg-transparent border-secondary">
                     <h5 class="text-white mb-0"><i class="fa fa-info-circle"></i> Sistema</h5>

@@ -103,6 +103,23 @@
             <div class="card-dashboard shadow">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
+                        <small class="text-secondary">Lucro das Peças</small>
+                        <h3 class="mt-2 fw-bold text-success">
+                            R$ {{ "{:,.2f}".format(lucro_pecas_total or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                        </h3>
+                        <small class="text-secondary">
+                            OS: R$ {{ "{:,.2f}".format(lucro_pecas_os or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                            | Venda: R$ {{ "{:,.2f}".format(lucro_pecas_venda or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                        </small>
+                    </div>
+                    <div style="font-size:40px;color:#10b981"><i class="fa fa-chart-line"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card-dashboard shadow">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
                         <small class="text-secondary">Ticket Médio</small>
                         <h3 class="mt-2 fw-bold">
                             R$ {{ "{:,.2f}".format(ticket_medio or 0).replace(",", "X").replace(".", ",").replace("X", ".") }}
@@ -120,17 +137,6 @@
                         <h2 class="mt-2 fw-bold {% if os_antigas > 0 %}text-danger{% endif %}">{{ os_antigas or 0 }}</h2>
                     </div>
                     <div style="font-size:40px;color:#ef4444"><i class="fa fa-exclamation-triangle"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div class="card-dashboard shadow">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <small class="text-secondary">Próximas Revisões</small>
-                        <h2 class="mt-2 fw-bold">{{ revisoes|length if revisoes else 0 }}</h2>
-                    </div>
-                    <div style="font-size:40px;color:#f97316"><i class="fa fa-calendar-alt"></i></div>
                 </div>
             </div>
         </div>

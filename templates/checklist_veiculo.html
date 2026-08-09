@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Checklist de Entrada - OS {{ ordem.numero }}{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-white mb-1">Checklist de Entrada</h2>
+            <p class="text-secondary mb-0">
+                OS nº {{ ordem.numero }}
+                {% if ordem.veiculo %}
+                • {{ ordem.veiculo.placa }} – {{ ordem.veiculo.marca }} {{ ordem.veiculo.modelo }}
+                {% endif %}
+            </p>
+        </div>
+        <a href="/ordens" class="btn btn-secondary">Voltar</a>
+    </div>
+
+    {% if request.args.get('sucesso') %}
+    <div class="alert alert-success">
+        Checklist de entrada salvo com sucesso!
+    </div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data" id="form-checklist">
+
+        <!-- ===================== FOTOS ===================== -->
+        <div class="card bg-dark border-0 shadow mb-4">
+            <div class="card-header bg-warning text-dark fw-bold">
+                1. Fotos do veículo na entrada
+            </div>
+            <div class="card-body">
+
+                <div class="alert alert-info mb-3">
+                    <strong>📱 Use o celular ou tablet</strong><br>
+                    Ao clicar nos campos abaixo no celular, vai aparecer a opção <strong>Tirar Foto</strong> (abre a câmera) e também <strong>Escolher da Galeria</strong>.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-secondary">Frente</label>
+                        <input type="file" name="fotos" accept="image/*" capture="environment" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-secondary">Traseira</label>
+                        <input type="file" name="fotos" accept="image/*" capture="environment" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-secondary">Lateral Esquerda</label>
+                        <input type="file" name="fotos" accept="image/*" capture="environment" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-secondary">Lateral Direita</label>
+                        <input type="file" name="fotos" accept="image/*" capture="environment" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-secondary">Painel / Interior</label>
+                        <input type="file" name="fotos" accept="image/*" capture="environment" class="form-control bg-dark text-white border-secondary">
+                    </div>
+                </div>
+
+                {% if checklist and checklist.fotos %}
+                <div class="mt-4">
+                    <label class="text-secondary small">Fotos já salvas:</label>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        {% for foto in checklist.fotos.split(',') if foto %}
+                        <img src="/{{ foto }}" style="width:110px; height:85px; object-fit:cover; border-radius:8px; border:1px solid #555;" onerror="this.style.display='none'">
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ===================== ESTADO DO VEÍCULO ===================== -->
+        <div class="card bg-dark border-0 shadow mb-4">
+            <div class="card-header bg-info text-white fw-bold">
+                2. Estado do veículo na entrada
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% set itens = [
+                        ("farois", "Faróis"), ("lanternas", "Lanternas"), ("setas", "Setas"),
+                        ("pneus", "Pneus"), ("lataria", "Lataria"), ("para_choques", "Para-choques"),
+                        ("vidros", "Vidros"), ("retrovisores", "Retrovisores"), ("interior", "Interior"),
+                        ("bancos", "Bancos"), ("painel", "Painel"), ("tapetes", "Tapetes"),
+                        ("estepe", "Estepe"), ("macaco", "Macaco"), ("triangulo", "Triângulo"),
+                        ("documentos", "Documentos"), ("chave_reserva", "Chave Reserva")
+                    ] %}
+                    {% for campo, label in itens %}
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <label class="form-label text-secondary">{{ label }}</label>
+                        <select name="{{ campo }}" class="form-select bg-dark text-white border-secondary">
+                            <option value="OK" {% if checklist and checklist[campo] == 'OK' %}selected{% endif %}>OK</option>
+                            <option value="DANIFICADO" {% if checklist and checklist[campo] == 'DANIFICADO' %}selected{% endif %}>Danificado</option>
+                            <option value="NAO_VERIFICADO" {% if checklist and checklist[campo] == 'NAO_VERIFICADO' %}selected{% endif %}>Não Verificado</option>
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================== OBSERVAÇÕES ===================== -->
+        <div class="card bg-dark border-0 shadow mb-4">
+            <div class="card-header bg-secondary text-white fw-bold">
+                3. Observações / Avarias encontradas
+            </div>
+            <div class="card-body">
+                <textarea name="observacoes" rows="4" class="form-control bg-dark text-white border-secondary"
+                    placeholder="Descreva avarias, riscos, amassados, peças faltando, etc.">{{ checklist.observacoes if checklist else '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- ===================== ASSINATURA ===================== -->
+        <div class="card bg-dark border-0 shadow mb-4">
+            <div class="card-header bg-success text-white fw-bold">
+                4. Assinatura do Cliente
+            </div>
+            <div class="card-body">
+                <p class="text-secondary small mb-2">Peça para o cliente assinar com o dedo abaixo:</p>
+                
+                <canvas id="assinatura" width="500" height="200" 
+                        style="background:#fff; border:2px solid #555; border-radius:8px; width:100%; max-width:500px; touch-action:none;"></canvas>
+                
+                <input type="hidden" name="assinatura" id="assinatura_input">
+                
+                <div class="mt-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="limparAssinatura()">
+                        Limpar Assinatura
+                    </button>
+                </div>
+
+                {% if checklist and checklist.assinatura %}
+                <div class="mt-3">
+                    <label class="text-secondary small">Assinatura já salva:</label><br>
+                    <img src="{{ checklist.assinatura }}" style="max-width:300px; background:#fff; border-radius:6px; padding:5px;">
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-warning btn-lg" onclick="salvarAssinatura()">
+                <i class="fa fa-save"></i> Salvar Checklist de Entrada
+            </button>
+
+            {% if checklist %}
+            <a href="/ordens/{{ ordem.id }}/checklist/pdf" target="_blank" class="btn btn-outline-light btn-lg">
+                📄 Gerar PDF do Checklist
+            </a>
+            {% endif %}
+
+            <a href="/ordens" class="btn btn-outline-secondary btn-lg">Cancelar</a>
+        </div>
+
+    </form>
+</div>
+
+<script>
+const canvas = document.getElementById('assinatura');
+const ctx = canvas.getContext('2d');
+let desenhando = false;
+
+// Ajusta o tamanho real do canvas
+function ajustarCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = 200;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+}
+ajustarCanvas();
+window.addEventListener('resize', ajustarCanvas);
+
+function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+    };
+}
+
+function iniciar(e) {
+    e.preventDefault();
+    desenhando = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+}
+
+function desenhar(e) {
+    if (!desenhando) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+}
+
+function parar() {
+    desenhando = false;
+}
+
+canvas.addEventListener('mousedown', iniciar);
+canvas.addEventListener('mousemove', desenhar);
+canvas.addEventListener('mouseup', parar);
+canvas.addEventListener('mouseout', parar);
+
+canvas.addEventListener('touchstart', iniciar);
+canvas.addEventListener('touchmove', desenhar);
+canvas.addEventListener('touchend', parar);
+
+function limparAssinatura() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function salvarAssinatura() {
+    const dataURL = canvas.toDataURL('image/png');
+    document.getElementById('assinatura_input').value = dataURL;
+}
+</script>
+{% endblock %}

@@ -49,11 +49,12 @@
                     <thead>
                         <tr>
                             <th>Produto</th>
-                            <th width="100">Estoque</th>
-                            <th width="110">Qtd</th>
-                            <th width="130">Valor Unit.</th>
-                            <th width="120">Total</th>
-                            <th width="150">Origem</th>
+                            <th width="80">Estoque</th>
+                            <th width="90">Qtd</th>
+                            <th width="110">Custo</th>
+                            <th width="110">Valor Unit.</th>
+                            <th width="110">Total</th>
+                            <th width="130">Origem</th>
                             <th width="50"></th>
                         </tr>
                     </thead>
@@ -63,7 +64,10 @@
             </div>
 
             <div class="d-flex justify-content-between align-items-center mt-3">
-                <h4 class="text-white">Total: R$ <span id="total-geral">0,00</span></h4>
+                <div>
+                    <h4 class="text-white mb-1">Total: R$ <span id="total-geral">0,00</span></h4>
+                    <small class="text-success">Lucro estimado: R$ <span id="lucro-estimado">0,00</span></small>
+                </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-light btn-lg" id="btn-pdf" disabled onclick="gerarPDF()">
                         📄 Gerar PDF
@@ -96,13 +100,14 @@
                                 <th>Código</th>
                                 <th>Descrição</th>
                                 <th>Estoque</th>
-                                <th>Preço</th>
+                                <th>Custo</th>
+                                <th>Venda</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody id="resultadoBusca">
                             <tr>
-                                <td colspan="5" class="text-center text-secondary">Digite pelo menos 2 letras para buscar...</td>
+                                <td colspan="6" class="text-center text-secondary">Digite pelo menos 2 letras para buscar...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -144,7 +149,7 @@ document.getElementById('buscaProduto').addEventListener('input', function() {
     
     if (termo.length < 2) {
         document.getElementById('resultadoBusca').innerHTML = 
-            '<tr><td colspan="5" class="text-center text-secondary">Digite pelo menos 2 letras...</td></tr>';
+            '<tr><td colspan="6" class="text-center text-secondary">Digite pelo menos 2 letras...</td></tr>';
         return;
     }
 
@@ -154,7 +159,7 @@ document.getElementById('buscaProduto').addEventListener('input', function() {
             .then(lista => {
                 const tbody = document.getElementById('resultadoBusca');
                 if (lista.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-secondary">Nenhum produto encontrado</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary">Nenhum produto encontrado</td></tr>';
                     return;
                 }
 
@@ -169,7 +174,8 @@ document.getElementById('buscaProduto').addEventListener('input', function() {
                             <td>${p.codigo || '-'}</td>
                             <td>${p.descricao}</td>
                             <td>${badge}</td>
-                            <td>R$ ${Number(p.preco_venda).toFixed(2).replace('.', ',')}</td>
+                            <td>R$ ${Number(p.preco_compra || 0).toFixed(2).replace('.', ',')}</td>
+                            <td>R$ ${Number(p.preco_venda || 0).toFixed(2).replace('.', ',')}</td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-success" 
                                     onclick='adicionarDaConsulta(${JSON.stringify(p)})'>
@@ -205,6 +211,7 @@ function adicionarItem(data) {
         descricao: data.descricao,
         estoque: estoque,
         quantidade: 1,
+        custo_unitario: data.preco_compra || 0,
         valor_unitario: data.preco_venda || 0,
         origem: origemPadrao
     });
@@ -220,6 +227,7 @@ function adicionarManual() {
         descricao: desc,
         estoque: 0,
         quantidade: 1,
+        custo_unitario: 0,
         valor_unitario: 0,
         origem: 'PARCEIRO'
     });
@@ -230,14 +238,26 @@ function renderItens() {
     const tbody = document.getElementById('corpo-itens');
     tbody.innerHTML = '';
     let total = 0;
+    let lucro = 0;
 
     itens.forEach((item, index) => {
         const subtotal = item.quantidade * item.valor_unitario;
+        const custoTotal = item.quantidade * (item.custo_unitario || 0);
         total += subtotal;
+        lucro += (subtotal - custoTotal);
 
         const estoqueTxt = item.produto_id > 0 
             ? (item.estoque > 0 ? item.estoque : '0') 
             : '-';
+
+        // Custo: editável só se for PARCEIRO
+        const custoInput = item.origem === 'PARCEIRO'
+            ? `<input type="number" name="custo_unitario[]" value="${item.custo_unitario || 0}" step="0.01"
+                      class="form-control form-control-sm bg-dark text-white"
+                      onchange="atualizarCusto(${index}, this.value)">`
+            : `<input type="number" name="custo_unitario[]" value="${item.custo_unitario || 0}" step="0.01"
+                      class="form-control form-control-sm bg-dark text-white" readonly
+                      style="opacity:0.7;">`;
 
         tbody.innerHTML += `
             <tr>
@@ -254,6 +274,7 @@ function renderItens() {
                            class="form-control form-control-sm bg-dark text-white"
                            onchange="atualizarQtd(${index}, this.value)">
                 </td>
+                <td>${custoInput}</td>
                 <td>
                     <input type="number" name="valor_unitario[]" value="${item.valor_unitario}" step="0.01"
                            class="form-control form-control-sm bg-dark text-white"
@@ -275,6 +296,7 @@ function renderItens() {
     });
 
     document.getElementById('total-geral').innerText = total.toFixed(2).replace('.', ',');
+    document.getElementById('lucro-estimado').innerText = lucro.toFixed(2).replace('.', ',');
     document.getElementById('btn-finalizar').disabled = itens.length === 0;
     document.getElementById('btn-pdf').disabled = itens.length === 0;
 }
@@ -289,8 +311,14 @@ function atualizarValor(index, valor) {
     renderItens();
 }
 
+function atualizarCusto(index, valor) {
+    itens[index].custo_unitario = parseFloat(valor) || 0;
+    renderItens();
+}
+
 function atualizarOrigem(index, valor) {
     itens[index].origem = valor;
+    renderItens();
 }
 
 function removerItem(index) {

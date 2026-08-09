@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Abrir OS por Placa{% endblock %}
+
+{% block conteudo %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white mb-0">Abrir Ordem de Serviço por Placa</h2>
+        <a href="/ordens" class="btn btn-secondary">Voltar</a>
+    </div>
+
+    <div class="row">
+        <!-- ===== OPÇÃO 1: FOTO DA PLACA (PRINCIPAL) ===== -->
+        <div class="col-md-6 mb-4">
+            <div class="card bg-dark border-warning shadow h-100">
+                <div class="card-header bg-warning text-dark fw-bold">
+                    1. Tirar foto da placa (recomendado)
+                </div>
+                <div class="card-body text-center">
+
+                    <div id="camera-container" class="mb-3" style="display:none;">
+                        <video id="video" autoplay playsinline style="width:100%; max-height:280px; border-radius:8px; background:#000;"></video>
+                        <canvas id="canvas" style="display:none;"></canvas>
+                    </div>
+
+                    <div id="preview-container" class="mb-3" style="display:none;">
+                        <img id="preview" style="width:100%; max-height:280px; border-radius:8px; object-fit:contain;">
+                    </div>
+
+                    <div id="resultado-ocr" class="alert alert-info d-none mb-3"></div>
+
+                    <div class="d-grid gap-2">
+                        <button type="button" id="btn-ligar-camera" class="btn btn-warning btn-lg" onclick="ligarCamera()">
+                            📷 Abrir Câmera
+                        </button>
+
+                        <button type="button" id="btn-capturar" class="btn btn-success btn-lg d-none" onclick="capturarFoto()">
+                            📸 Capturar Placa
+                        </button>
+
+                        <button type="button" id="btn-processar" class="btn btn-primary btn-lg d-none" onclick="enviarFoto()">
+                            🔍 Ler Placa e Abrir OS
+                        </button>
+
+                        <button type="button" id="btn-nova-foto" class="btn btn-outline-secondary d-none" onclick="novaFoto()">
+                            Tirar outra foto
+                        </button>
+                    </div>
+
+                    <p class="text-secondary small mt-3 mb-0">
+                        Posicione a placa bem iluminada e centralizada na câmera.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== OPÇÃO 2: DIGITAR A PLACA ===== -->
+        <div class="col-md-6 mb-4">
+            <div class="card bg-dark border-secondary shadow h-100">
+                <div class="card-header bg-secondary text-white fw-bold">
+                    2. Digitar a placa
+                </div>
+                <div class="card-body">
+
+                    <form method="POST" action="/ordens/por-placa">
+                        <div class="mb-3">
+                            <label class="text-secondary">Placa do veículo</label>
+                            <input type="text" 
+                                   name="placa" 
+                                   class="form-control form-control-lg bg-dark text-white border-secondary text-uppercase"
+                                   placeholder="Ex: ABC1D23"
+                                   maxlength="8"
+                                   style="letter-spacing: 2px; font-weight: bold;">
+                        </div>
+
+                        <button type="submit" class="btn btn-outline-warning w-100 btn-lg">
+                            Buscar e Abrir OS
+                        </button>
+                    </form>
+
+                    {% if mensagem %}
+                    <div class="alert alert-{{ tipo_alerta }} mt-4 mb-0">
+                        {{ mensagem|safe }}
+                        {% if mostrar_botao_cadastro %}
+                        <div class="mt-3">
+                            <a href="/veiculos/novo?placa={{ placa_digitada }}" class="btn btn-sm btn-primary">
+                                Cadastrar este veículo agora
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let stream = null;
+let fotoBlob = null;
+
+async function ligarCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "environment" },
+            audio: false 
+        });
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+        
+        document.getElementById('camera-container').style.display = 'block';
+        document.getElementById('btn-ligar-camera').classList.add('d-none');
+        document.getElementById('btn-capturar').classList.remove('d-none');
+        document.getElementById('preview-container').style.display = 'none';
+        document.getElementById('btn-processar').classList.add('d-none');
+        document.getElementById('btn-nova-foto').classList.add('d-none');
+        document.getElementById('resultado-ocr').classList.add('d-none');
+    } catch (err) {
+        alert("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
+        console.error(err);
+    }
+}
+
+function capturarFoto() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const preview = document.getElementById('preview');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+
+    canvas.toBlob(function(blob) {
+        fotoBlob = blob;
+        preview.src = URL.createObjectURL(blob);
+        
+        document.getElementById('camera-container').style.display = 'none';
+        document.getElementById('preview-container').style.display = 'block';
+        document.getElementById('btn-capturar').classList.add('d-none');
+        document.getElementById('btn-processar').classList.remove('d-none');
+        document.getElementById('btn-nova-foto').classList.remove('d-none');
+    }, 'image/jpeg', 0.92);
+}
+
+function novaFoto() {
+    document.getElementById('preview-container').style.display = 'none';
+    document.getElementById('btn-processar').classList.add('d-none');
+    document.getElementById('btn-nova-foto').classList.add('d-none');
+    document.getElementById('resultado-ocr').classList.add('d-none');
+    document.getElementById('btn-ligar-camera').classList.remove('d-none');
+    fotoBlob = null;
+}
+
+async function enviarFoto() {
+    if (!fotoBlob) {
+        alert("Nenhuma foto capturada.");
+        return;
+    }
+
+    const resultado = document.getElementById('resultado-ocr');
+    resultado.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-info');
+    resultado.classList.add('alert-info');
+    resultado.innerHTML = "🔍 Lendo a placa... aguarde...";
+
+    const formData = new FormData();
+    formData.append('foto', fotoBlob, 'placa.jpg');
+
+    try {
+        const response = await fetch('/api/ler-placa', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.sucesso && data.placa) {
+            resultado.classList.remove('alert-info');
+            resultado.classList.add('alert-success');
+            resultado.innerHTML = `Placa reconhecida: <strong>${data.placa}</strong><br>Redirecionando...`;
+            
+            setTimeout(() => {
+                window.location.href = `/ordens/por-placa?placa=${data.placa}`;
+            }, 1200);
+        } else {
+            resultado.classList.remove('alert-info');
+            resultado.classList.add('alert-danger');
+            resultado.innerHTML = data.mensagem || "Não foi possível ler a placa. Tente novamente com melhor iluminação.";
+        }
+    } catch (err) {
+        resultado.classList.remove('alert-info');
+        resultado.classList.add('alert-danger');
+        resultado.innerHTML = "Erro ao processar a imagem. Tente novamente.";
+        console.error(err);
+    }
+}
+</script>
+{% endblock %}

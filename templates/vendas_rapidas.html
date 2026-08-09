@@ -19,6 +19,7 @@
                         <th>Cliente</th>
                         <th>Valor Total</th>
                         <th>Itens</th>
+                        <th width="120">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -29,10 +30,15 @@
                         <td>{{ v.cliente.nome if v.cliente else 'Balcão' }}</td>
                         <td>R$ {{ "%.2f"|format(v.valor_total or 0) }}</td>
                         <td>{{ v.itens|length }} item(ns)</td>
+                        <td>
+                            <a href="/vendas-rapidas/{{ v.id }}/nfse" class="btn btn-outline-info btn-sm" title="Emitir NFS-e">
+                                NF
+                            </a>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center text-secondary py-4">Nenhuma venda rápida registrada.</td>
+                        <td colspan="6" class="text-center text-secondary py-4">Nenhuma venda rápida registrada.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
