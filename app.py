@@ -728,32 +728,20 @@ def ordens():
         data_fim=data_fim,
         status=status
     )
-@app.route("/ordens/por-placa", methods=["GET", "POST"])
+@app.route("/abrir-os-placa", methods=["GET", "POST"])
 @login_required
 def ordens_por_placa():
-    # Quando vem da foto (query string)
-    placa_query = request.args.get("placa")
-    if placa_query:
-        placa = placa_query.strip().upper().replace("-", "").replace(" ", "")
-        veiculo = Veiculo.query.filter(Veiculo.placa == placa).first()
-        if veiculo:
-            return redirect(f"/ordens/nova?cliente_id={veiculo.cliente_id}&veiculo_id={veiculo.id}")
-        else:
-            return render_template(
-                "ordens_por_placa.html",
-                mensagem=f"Nenhum veículo encontrado com a placa <strong>{placa}</strong>.",
-                tipo_alerta="danger",
-                mostrar_botao_cadastro=True,
-                placa_digitada=placa
-            )
+    placa = None
 
-    if request.method == "GET":
+    if request.args.get("placa"):
+        placa = request.args.get("placa").strip().upper().replace("-", "").replace(" ", "")
+    elif request.method == "POST":
+        placa = (request.form.get("placa") or "").strip().upper().replace("-", "").replace(" ", "")
+
+    if not placa:
         return render_template("ordens_por_placa.html")
 
-    # Quando digita a placa manualmente
-    placa = (request.form.get("placa") or "").strip().upper().replace("-", "").replace(" ", "")
-    
-    if not placa or len(placa) < 7:
+    if len(placa) < 7:
         return render_template(
             "ordens_por_placa.html",
             mensagem="Digite uma placa válida (mínimo 7 caracteres).",
@@ -761,16 +749,50 @@ def ordens_por_placa():
             placa_digitada=placa
         )
 
-    veiculo = Veiculo.query.filter(Veiculo.placa == placa).first()
+        veiculo = None
+    for v in Veiculo.query.all():
+        placa_banco = (v.placa or "").replace("-", "").replace(" ", "").upper()
+        if placa_banco == placa:
+            veiculo = v
+            break
 
-    if veiculo:
-        return redirect(f"/ordens/nova?cliente_id={veiculo.cliente_id}&veiculo_id={veiculo.id}")
-    else:
+    if not veiculo:
         return render_template(
             "ordens_por_placa.html",
-            mensagem=f"Nenhum veículo encontrado com a placa <strong>{placa}</strong>.",
+            mensagem=f"Nenhum veículo encontrado com a placa {placa}.",
             tipo_alerta="danger",
             mostrar_botao_cadastro=True,
+            placa_digitada=placa
+        )
+
+    try:
+        ano = date.today().year
+        prefixo = ano * 10000
+        ultimo = db.session.query(func.max(OrdemServico.numero)).scalar() or 0
+        numero = prefixo + 1 if ultimo < prefixo else ultimo + 1
+
+        ordem = OrdemServico(
+            numero=numero,
+            cliente_id=veiculo.cliente_id,
+            veiculo_id=veiculo.id,
+            km=veiculo.km,
+            status="ABERTA",
+            data_abertura=datetime.now(),
+            empresa_id=session.get("empresa_id") or 1,
+            valor_servicos=0,
+            valor_produtos=0,
+            desconto=0,
+            valor_total=0,
+        )
+        db.session.add(ordem)
+        db.session.commit()
+        return redirect(f"/ordens/editar/{ordem.id}")
+    except Exception as e:
+        db.session.rollback()
+        return render_template(
+            "ordens_por_placa.html",
+            mensagem=f"Erro ao criar a OS: {str(e)}",
+            tipo_alerta="danger",
             placa_digitada=placa
         )
 
@@ -907,7 +929,7 @@ def nova_ordem():
 
         for d in detalhes:
             m = d["mecanico"]
-            perc = float(m.percentual_comissao or 20)
+            perc = float(d.get("comissao") if d.get("comissao") is not None else (m.percentual_comissao or 20))
             base = d["valor"]
             comissao = round(base * perc / 100.0, 2)
             db.session.add(OrdemServicoMecanico(
@@ -971,6 +993,7 @@ def nova_ordem():
         descricoes = request.form.getlist("item_descricao")
         qtds = request.form.getlist("item_qtd")
         valores_unit = request.form.getlist("item_valor_unit")
+        custos = request.form.getlist("item_custo")
 
         n = max(len(produtos_ids), len(tipos), len(descricoes), len(qtds), len(valores_unit))
 
@@ -1010,6 +1033,13 @@ def nova_ordem():
 
                 if not desc:
                     desc = "Peça"
+                try:
+                    custo = float(custos[i] if i < len(custos) else 0)
+                except Exception:
+                    custo = 0.0
+
+                if custo == 0 and tipo == "ESTOQUE" and prod:
+                    custo = float(prod.preco_compra or 0)
 
                 item = ItemOrdemServico(
                     ordem_servico_id=ordem.id,
@@ -1018,6 +1048,7 @@ def nova_ordem():
                     tipo_item="PRODUTO",
                     descricao=desc,
                     quantidade=qtd,
+                    custo_unitario=custo,
                     valor_unitario=vu,
                     valor_total=qtd * vu,
                 )
@@ -1137,7 +1168,7 @@ def editar_ordem(id):
         # Serviços novos
         for d in detalhes:
             m = d["mecanico"]
-            perc = float(m.percentual_comissao or 20)
+            perc = float(d.get("comissao") if d.get("comissao") is not None else (m.percentual_comissao or 20))
             base = d["valor"]
             comissao = round(base * perc / 100.0, 2)
             db.session.add(OrdemServicoMecanico(
@@ -1158,6 +1189,7 @@ def editar_ordem(id):
         descricoes = request.form.getlist("item_descricao")
         qtds = request.form.getlist("item_qtd")
         valores_unit = request.form.getlist("item_valor_unit")
+        custos = request.form.getlist("item_custo")
 
         n = max(len(produtos_ids), len(tipos), len(descricoes), len(qtds), len(valores_unit))
 
@@ -1197,6 +1229,13 @@ def editar_ordem(id):
 
                 if not desc:
                     desc = "Peça"
+                try:
+                    custo = float(custos[i] if i < len(custos) else 0)
+                except Exception:
+                    custo = 0.0
+
+                if custo == 0 and tipo == "ESTOQUE" and prod:
+                    custo = float(prod.preco_compra or 0)
 
                 db.session.add(ItemOrdemServico(
                     ordem_servico_id=ordem.id,
@@ -1205,6 +1244,7 @@ def editar_ordem(id):
                     tipo_item="PRODUTO",
                     descricao=desc,
                     quantidade=qtd,
+                    custo_unitario=custo,
                     valor_unitario=vu,
                     valor_total=qtd * vu,
                 ))

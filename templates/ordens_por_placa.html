@@ -63,7 +63,7 @@
                 </div>
                 <div class="card-body">
 
-                    <form method="POST" action="/ordens/por-placa">
+                    <form method="POST" action="/abrir-os-placa">
                         <div class="mb-3">
                             <label class="text-secondary">Placa do veículo</label>
                             <input type="text" 
@@ -187,7 +187,7 @@ async function enviarFoto() {
             resultado.innerHTML = `Placa reconhecida: <strong>${data.placa}</strong><br>Redirecionando...`;
             
             setTimeout(() => {
-                window.location.href = `/ordens/por-placa?placa=${data.placa}`;
+                window.location.href = `/abrir-os-placa?placa=${data.placa}`;
             }, 1200);
         } else {
             resultado.classList.remove('alert-info');
