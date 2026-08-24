@@ -21,6 +21,10 @@ class Empresa(db.Model):
     whatsapp = db.Column(db.String(30))
     email = db.Column(db.String(150))
     site = db.Column(db.String(200))
+    data_vencimento = db.Column(db.Date)
+    status_pagamento = db.Column(db.String(20), default="ATIVO")  # ATIVO | BLOQUEADO | INATIVO
+    plano = db.Column(db.String(50), default="BASICO")
+    observacoes_internas = db.Column(db.Text)
 
     url_nfse = db.Column(db.String(255))
     # Campos para NFS-e Automática
@@ -454,6 +458,9 @@ class OrdemServico(db.Model):
     km = db.Column(db.Integer)
     consultor = db.Column(db.String(120))
     mecanico = db.Column(db.String(120))
+    mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"))
+    os_origem_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"))
+    is_retrabalho = db.Column(db.Boolean, default=False)
     defeito_relatado = db.Column(db.Text)
     diagnostico = db.Column(db.Text)
     servico_executado = db.Column(db.Text)
@@ -469,6 +476,8 @@ class OrdemServico(db.Model):
     empresa = db.relationship("Empresa")
     cliente = db.relationship("Cliente")
     veiculo = db.relationship("Veiculo")
+    mecanico_ref = db.relationship("Mecanico", foreign_keys=[mecanico_id])
+    os_origem = db.relationship("OrdemServico", remote_side=[id], foreign_keys=[os_origem_id])
     itens = db.relationship("ItemOrdemServico", back_populates="ordem_servico", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -602,6 +611,7 @@ class Mecanico(db.Model):
     __tablename__ = "mecanicos"
 
     id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"), nullable=False, default=1)
     nome = db.Column(db.String(120), nullable=False)
     telefone = db.Column(db.String(20))
     whatsapp = db.Column(db.String(20))

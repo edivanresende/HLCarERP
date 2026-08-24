@@ -40,6 +40,9 @@ from models import (
     ItemVendaRapida,
     LembreteEnvio,
     ChecklistVeiculo,
+    ContaReceber,
+    ContaPagar,
+    Caixa,
 )
 
 from pdf_ordem_old import gerar_pdf_ordem
@@ -65,7 +68,19 @@ def login_required(f):
     return decorated_function
 
 
+def empresa_atual():
+    """Retorna o empresa_id da sessão. Se não tiver, força logout."""
+    eid = session.get("empresa_id")
+    if not eid:
+        session.clear()
+        return None
+    return eid
+
+
 def criar_admin_se_nao_existir():
+
+
+
     """Cria a empresa e o usuário admin na primeira execução"""
     try:
         empresa = Empresa.query.first()
@@ -133,6 +148,10 @@ def corrigir_colunas_banco():
             "whatsapp": "VARCHAR(30)",
             "email": "VARCHAR(150)",
             "site": "VARCHAR(200)",
+                        "data_vencimento": "DATE",
+            "status_pagamento": "VARCHAR(20)",
+            "plano": "VARCHAR(50)",
+            "observacoes_internas": "TEXT",
             "url_nfse": "VARCHAR(255)",
             "nfse_provedor": "VARCHAR(50)",
             "inscricao_municipal": "VARCHAR(30)",
@@ -272,11 +291,17 @@ def login():
         usuario = Usuario.query.filter_by(login=login_digitado, ativo=True).first()
 
         if usuario and check_password_hash(usuario.senha, senha_digitada):
-            session["usuario_id"] = usuario.id
-            session["usuario_nome"] = usuario.nome
-            session["usuario_perfil"] = usuario.perfil
-            session["empresa_id"] = usuario.empresa_id
-            return redirect("/")
+            empresa = Empresa.query.get(usuario.empresa_id)
+            if empresa and empresa.status_pagamento == "BLOQUEADO":
+                erro = "Empresa bloqueada por atraso de pagamento. Entre em contato com o suporte."
+            elif empresa and not empresa.ativo:
+                erro = "Empresa inativa. Entre em contato com o suporte."
+            else:
+                session["usuario_id"] = usuario.id
+                session["usuario_nome"] = usuario.nome
+                session["usuario_perfil"] = usuario.perfil
+                session["empresa_id"] = usuario.empresa_id
+                return redirect("/")
         else:
             erro = "Usuário ou senha inválidos"
 
@@ -293,245 +318,658 @@ def logout():
 # DASHBOARD COM FILTRO DE DATA
 # ============================================================
 @app.route("/")
+@app.route("/dashboard")
 @login_required
 def dashboard():
-    from sqlalchemy import func
-    periodo = request.args.get("periodo")
-    data_inicio = request.args.get("data_inicio")
-    data_fim = request.args.get("data_fim")
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
 
-    query_os = OrdemServico.query
-    hoje = date.today()
+    from collections import defaultdict
 
-    if periodo == "hoje":
-        query_os = query_os.filter(func.date(OrdemServico.data_abertura) == hoje)
-    elif periodo == "semana":
-        inicio_semana = hoje - timedelta(days=hoje.weekday())
-        query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= inicio_semana)
-    elif periodo == "mes":
-        inicio_mes = hoje.replace(day=1)
-        query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= inicio_mes)
-    elif periodo == "ano":
-        inicio_ano = hoje.replace(month=1, day=1)
-        query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= inicio_ano)
-    elif data_inicio:
+    data_ini = request.args.get("data_ini") or date.today().replace(day=1).isoformat()
+    data_fim = request.args.get("data_fim") or date.today().isoformat()
+    try:
+        d_ini = datetime.strptime(data_ini, "%Y-%m-%d")
+        d_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+    except Exception:
+        d_ini = datetime.combine(date.today().replace(day=1), datetime.min.time())
+        d_fim = datetime.now() + timedelta(days=1)
+        data_ini = d_ini.date().isoformat()
+        data_fim = date.today().isoformat()
+
+    def _f(v):
         try:
-            di = datetime.strptime(data_inicio, "%Y-%m-%d").date()
-            query_os = query_os.filter(func.date(OrdemServico.data_abertura) >= di)
-            if data_fim:
-                df = datetime.strptime(data_fim, "%Y-%m-%d").date()
-                query_os = query_os.filter(func.date(OrdemServico.data_abertura) <= df)
+            return float(v or 0)
+        except Exception:
+            return 0.0
+
+    total_clientes = Cliente.query.filter_by(empresa_id=eid).count()
+    total_veiculos = Veiculo.query.filter_by(empresa_id=eid).count()
+
+    todas_os = OrdemServico.query.filter_by(empresa_id=eid)
+    q_os = todas_os.filter(
+        OrdemServico.data_abertura >= d_ini,
+        OrdemServico.data_abertura < d_fim,
+    )
+    os_periodo = q_os.all()
+
+    total_os = todas_os.count()
+    os_abertas = todas_os.filter(
+        func.upper(OrdemServico.status).in_(["ABERTA", "EM ANDAMENTO", "ANDAMENTO", "ORCAMENTO", "ORÇAMENTO"])
+    ).count()
+    os_concluidas = q_os.filter(
+        func.upper(OrdemServico.status).in_(["CONCLUIDA", "CONCLUÍDA", "FINALIZADA", "FECHADA"])
+    ).count()
+
+    receita_servicos = sum(_f(getattr(o, "valor_servicos", 0)) for o in os_periodo)
+    receita_pecas_os = sum(_f(getattr(o, "valor_produtos", 0)) for o in os_periodo)
+    faturamento_os = sum(_f(getattr(o, "valor_total", 0)) for o in os_periodo)
+    if faturamento_os == 0:
+        faturamento_os = receita_servicos + receita_pecas_os
+
+    faturamento_vendas = 0.0
+    qtd_vendas = 0
+    try:
+        qv = VendaRapida.query.filter(
+            VendaRapida.empresa_id == eid,
+            VendaRapida.data_venda >= d_ini,
+            VendaRapida.data_venda < d_fim,
+        )
+        vendas = qv.all()
+        qtd_vendas = len(vendas)
+        faturamento_vendas = sum(_f(getattr(v, "valor_total", 0)) for v in vendas)
+    except Exception as e:
+        print("Erro vendas dashboard:", e)
+
+    faturamento_total = faturamento_os + faturamento_vendas
+    ticket_medio = (faturamento_os / len(os_periodo)) if os_periodo else 0
+
+    lucro_estoque = lucro_parceiro = 0.0
+    receita_estoque = receita_parceiro = 0.0
+    custo_estoque = custo_parceiro = 0.0
+
+    try:
+        itens_os = (
+            db.session.query(ItemOrdemServico)
+            .join(OrdemServico, ItemOrdemServico.ordem_servico_id == OrdemServico.id)
+            .filter(
+                OrdemServico.empresa_id == eid,
+                OrdemServico.data_abertura >= d_ini,
+                OrdemServico.data_abertura < d_fim,
+            )
+            .all()
+        )
+        for item in itens_os:
+            venda = _f(getattr(item, "valor_total", 0))
+            if venda == 0:
+                venda = _f(getattr(item, "valor_unitario", 0)) * _f(getattr(item, "quantidade", 1))
+            custo = _f(getattr(item, "custo_unitario", 0)) * _f(getattr(item, "quantidade", 1) or 1)
+            origem = str(getattr(item, "origem", "") or "").upper()
+            if origem in ("ESTOQUE", "PROPRIO", "PRÓPRIO", ""):
+                lucro_estoque += (venda - custo)
+                receita_estoque += venda
+                custo_estoque += custo
+            else:
+                lucro_parceiro += (venda - custo)
+                receita_parceiro += venda
+                custo_parceiro += custo
+    except Exception as e:
+        print("Erro itens OS:", e)
+
+    try:
+        itens_vr = (
+            db.session.query(ItemVendaRapida)
+            .join(VendaRapida)
+            .filter(
+                VendaRapida.empresa_id == eid,
+                VendaRapida.data_venda >= d_ini,
+                VendaRapida.data_venda < d_fim,
+            )
+            .all()
+        )
+        for item in itens_vr:
+            venda = _f(getattr(item, "valor_total", 0))
+            custo = _f(getattr(item, "custo_unitario", 0)) * _f(getattr(item, "quantidade", 1) or 1)
+            origem = str(getattr(item, "origem", "") or "").upper()
+            if origem in ("ESTOQUE", "PROPRIO", "PRÓPRIO", ""):
+                lucro_estoque += (venda - custo)
+                receita_estoque += venda
+                custo_estoque += custo
+            else:
+                lucro_parceiro += (venda - custo)
+                receita_parceiro += venda
+                custo_parceiro += custo
+    except Exception as e:
+        print("Erro itens VR:", e)
+
+    lucro_pecas_total = lucro_estoque + lucro_parceiro
+    lucro_servicos = receita_servicos
+    lucro_geral = lucro_pecas_total + lucro_servicos
+
+    gastos_compras = 0.0
+    try:
+        for c in Compra.query.filter(
+            Compra.empresa_id == eid,
+            Compra.data_entrada >= d_ini,
+            Compra.data_entrada < d_fim,
+        ).all():
+            gastos_compras += _f(getattr(c, "valor_total", 0))
+    except Exception as e:
+        print("Erro compras:", e)
+
+    resultado = lucro_geral - gastos_compras
+
+    try:
+        estoque_baixo = Produto.query.filter(Produto.empresa_id == eid, Produto.estoque_atual <= 5).count()
+    except Exception:
+        estoque_baixo = 0
+
+    os_antigas = todas_os.filter(
+        func.upper(OrdemServico.status) == "ABERTA",
+        func.date(OrdemServico.data_abertura) <= (date.today() - timedelta(days=7)),
+    ).count()
+
+    try:
+        os_retrabalho = todas_os.filter(
+            db.or_(OrdemServico.is_retrabalho == True, func.upper(OrdemServico.status) == "RETRABALHO")
+        ).count()
+    except Exception:
+        os_retrabalho = todas_os.filter(func.upper(OrdemServico.status) == "RETRABALHO").count()
+
+    ranking = []
+    try:
+        mapa = defaultdict(lambda: {"qtd": 0, "faturamento": 0.0, "retrabalho": 0, "nome": "Sem mecânico"})
+        for vinculo in OrdemServicoMecanico.query.join(OrdemServico).filter(OrdemServico.empresa_id == eid).all():
+            mid = vinculo.mecanico_id or 0
+            mec = Mecanico.query.get(mid)
+            nome = mec.nome if mec else f"ID {mid}"
+            o = vinculo.ordem_servico
+            mapa[mid]["nome"] = nome
+            mapa[mid]["qtd"] += 1
+            mapa[mid]["faturamento"] += _f(getattr(o, "valor_total", 0))
+            if getattr(o, "is_retrabalho", False) or str(getattr(o, "status", "")).upper() == "RETRABALHO":
+                mapa[mid]["retrabalho"] += 1
+        if not mapa:
+            for o in todas_os.all():
+                mid = getattr(o, "mecanico_id", None) or 0
+                nome = getattr(o, "mecanico", None) or "Sem mecânico"
+                if mid:
+                    mec = Mecanico.query.get(mid)
+                    nome = mec.nome if mec else nome
+                chave = mid or nome
+                mapa[chave]["nome"] = nome
+                mapa[chave]["qtd"] += 1
+                mapa[chave]["faturamento"] += _f(getattr(o, "valor_total", 0))
+                if getattr(o, "is_retrabalho", False) or str(getattr(o, "status", "")).upper() == "RETRABALHO":
+                    mapa[chave]["retrabalho"] += 1
+        ranking = sorted(mapa.values(), key=lambda x: x["faturamento"], reverse=True)
+    except Exception as e:
+        print("Erro ranking:", e)
+
+    os_recentes = todas_os.order_by(OrdemServico.data_abertura.desc()).limit(8).all()
+
+    labels_status, valores_status = [], []
+    try:
+        for st, qtd in db.session.query(OrdemServico.status, func.count(OrdemServico.id)).filter_by(empresa_id=eid).group_by(OrdemServico.status).all():
+            labels_status.append(st or "Sem status")
+            valores_status.append(int(qtd))
+    except Exception:
+        pass
+
+    labels_meses, valores_meses = [], []
+    try:
+        seis = datetime.now() - timedelta(days=180)
+        rows = db.session.query(
+            func.strftime("%Y-%m", OrdemServico.data_abertura).label("mes"),
+            func.coalesce(func.sum(OrdemServico.valor_total), 0),
+        ).filter(OrdemServico.empresa_id == eid, OrdemServico.data_abertura >= seis).group_by("mes").order_by("mes").all()
+        for mes, valor in rows:
+            labels_meses.append(mes or "")
+            valores_meses.append(float(valor or 0))
+    except Exception as e:
+        print("Erro grafico:", e)
+            # ========== RODADA A: FINANCEIRO + OPERAÇÃO ==========
+    hoje = date.today()
+    em_7 = hoje + timedelta(days=7)
+    em_30 = hoje + timedelta(days=30)
+
+    # --- Contas a Receber ---
+    receber_vencidas = 0.0
+    receber_7 = 0.0
+    receber_30 = 0.0
+    receber_total_pendente = 0.0
+    try:
+        for cr in ContaReceber.query.filter(
+            ContaReceber.empresa_id == eid,
+            ContaReceber.status.in_(["PENDENTE", "PARCIAL", "ABERTA"]),
+        ).all():
+            valor_aberto = _f(getattr(cr, "valor", 0)) - _f(getattr(cr, "valor_recebido", 0))
+            if valor_aberto <= 0:
+                continue
+            receber_total_pendente += valor_aberto
+            venc = getattr(cr, "data_vencimento", None)
+            if not venc:
+                continue
+            if hasattr(venc, "date"):
+                venc = venc.date()
+            if venc < hoje:
+                receber_vencidas += valor_aberto
+            elif venc <= em_7:
+                receber_7 += valor_aberto
+            elif venc <= em_30:
+                receber_30 += valor_aberto
+    except Exception as e:
+        print("Erro contas receber dashboard:", e)
+
+    # --- Contas a Pagar ---
+    pagar_vencidas = 0.0
+    pagar_7 = 0.0
+    pagar_30 = 0.0
+    pagar_total_pendente = 0.0
+    try:
+        for cp in ContaPagar.query.filter(
+            ContaPagar.empresa_id == eid,
+            ContaPagar.status.in_(["PENDENTE", "PARCIAL", "ABERTA"]),
+        ).all():
+            valor_aberto = _f(getattr(cp, "valor", 0)) - _f(getattr(cp, "valor_pago", 0))
+            if valor_aberto <= 0:
+                continue
+            pagar_total_pendente += valor_aberto
+            venc = getattr(cp, "data_vencimento", None)
+            if not venc:
+                continue
+            if hasattr(venc, "date"):
+                venc = venc.date()
+            if venc < hoje:
+                pagar_vencidas += valor_aberto
+            elif venc <= em_7:
+                pagar_7 += valor_aberto
+            elif venc <= em_30:
+                pagar_30 += valor_aberto
+    except Exception as e:
+        print("Erro contas pagar dashboard:", e)
+
+    # --- Caixa do período ---
+    caixa_entradas = 0.0
+    caixa_saidas = 0.0
+    try:
+        for cx in Caixa.query.filter(
+            Caixa.empresa_id == eid,
+            Caixa.data_movimento >= d_ini,
+            Caixa.data_movimento < d_fim,
+        ).all():
+            v = _f(getattr(cx, "valor", 0))
+            tipo = str(getattr(cx, "tipo", "") or "").upper()
+            if tipo in ("ENTRADA", "C", "CREDITO", "CRÉDITO", "+"):
+                caixa_entradas += abs(v)
+            elif tipo in ("SAIDA", "SAÍDA", "D", "DEBITO", "DÉBITO", "-"):
+                caixa_saidas += abs(v)
+            else:
+                if v >= 0:
+                    caixa_entradas += v
+                else:
+                    caixa_saidas += abs(v)
+    except Exception as e:
+        print("Erro caixa dashboard:", e)
+    caixa_saldo = caixa_entradas - caixa_saidas
+
+    # --- Inadimplência ---
+    inadimplencia_valor = receber_vencidas
+    try:
+        faturado_base = faturamento_total if faturamento_total > 0 else 1
+        inadimplencia_pct = (inadimplencia_valor / faturado_base) * 100
+    except Exception:
+        inadimplencia_pct = 0.0
+
+    # --- OS paradas (+7 e +15 dias) ---
+    os_paradas_7 = 0
+    os_paradas_15 = 0
+    valor_preso_7 = 0.0
+    valor_preso_15 = 0.0
+    try:
+        limite_7 = hoje - timedelta(days=7)
+        limite_15 = hoje - timedelta(days=15)
+        for o in todas_os.filter(
+            func.upper(OrdemServico.status).in_(["ABERTA", "EM ANDAMENTO", "ANDAMENTO", "ORCAMENTO", "ORÇAMENTO", "RETRABALHO"])
+        ).all():
+            da = getattr(o, "data_abertura", None)
+            if not da:
+                continue
+            if hasattr(da, "date"):
+                da = da.date()
+            vt = _f(getattr(o, "valor_total", 0))
+            if da <= limite_15:
+                os_paradas_15 += 1
+                valor_preso_15 += vt
+            elif da <= limite_7:
+                os_paradas_7 += 1
+                valor_preso_7 += vt
+    except Exception as e:
+        print("Erro OS paradas:", e)
+
+    # --- Comparativo mês anterior ---
+    try:
+        mes_atual_ini = hoje.replace(day=1)
+        if mes_atual_ini.month == 1:
+            mes_ant_ini = mes_atual_ini.replace(year=mes_atual_ini.year - 1, month=12)
+        else:
+            mes_ant_ini = mes_atual_ini.replace(month=mes_atual_ini.month - 1)
+        mes_ant_fim = mes_atual_ini
+
+        fat_mes_atual = 0.0
+        for o in OrdemServico.query.filter(
+            OrdemServico.empresa_id == eid,
+            OrdemServico.data_abertura >= datetime.combine(mes_atual_ini, datetime.min.time()),
+            OrdemServico.data_abertura < datetime.combine(hoje + timedelta(days=1), datetime.min.time()),
+        ).all():
+            fat_mes_atual += _f(getattr(o, "valor_total", 0))
+        try:
+            for v in VendaRapida.query.filter(
+                VendaRapida.empresa_id == eid,
+                VendaRapida.data_venda >= datetime.combine(mes_atual_ini, datetime.min.time()),
+                VendaRapida.data_venda < datetime.combine(hoje + timedelta(days=1), datetime.min.time()),
+            ).all():
+                fat_mes_atual += _f(getattr(v, "valor_total", 0))
         except Exception:
             pass
 
-    total_clientes = Cliente.query.count()
-    total_veiculos = Veiculo.query.count()
-    total_ordens = query_os.count()
-    faturamento = query_os.with_entities(func.coalesce(func.sum(OrdemServico.valor_total), 0)).scalar() or 0
+        fat_mes_anterior = 0.0
+        for o in OrdemServico.query.filter(
+            OrdemServico.empresa_id == eid,
+            OrdemServico.data_abertura >= datetime.combine(mes_ant_ini, datetime.min.time()),
+            OrdemServico.data_abertura < datetime.combine(mes_ant_fim, datetime.min.time()),
+        ).all():
+            fat_mes_anterior += _f(getattr(o, "valor_total", 0))
+        try:
+            for v in VendaRapida.query.filter(
+                VendaRapida.empresa_id == eid,
+                VendaRapida.data_venda >= datetime.combine(mes_ant_ini, datetime.min.time()),
+                VendaRapida.data_venda < datetime.combine(mes_ant_fim, datetime.min.time()),
+            ).all():
+                fat_mes_anterior += _f(getattr(v, "valor_total", 0))
+        except Exception:
+            pass
 
-    # Ordens em andamento (ABERTA)
-    ordens_andamento = query_os.filter(OrdemServico.status == "ABERTA").count()
-
-    # Contas a receber = valor das OS abertas
-    contas_receber = query_os.filter(OrdemServico.status == "ABERTA").with_entities(
-        func.coalesce(func.sum(OrdemServico.valor_total), 0)
-    ).scalar() or 0
-
-    # Últimas 8 OS
-    ultimas_ordens = OrdemServico.query.order_by(OrdemServico.id.desc()).limit(8).all()
-
-    # Veículos em atendimento (OS abertas)
-    veiculos_atendimento = (
-        db.session.query(OrdemServico, Veiculo, Cliente)
-        .join(Veiculo, OrdemServico.veiculo_id == Veiculo.id)
-        .join(Cliente, OrdemServico.cliente_id == Cliente.id)
-        .filter(OrdemServico.status == "ABERTA")
-        .order_by(OrdemServico.id.desc())
-        .limit(8)
-        .all()
-    )
-
-    # Produtos com estoque baixo
-    try:
-        produtos_baixo = []
-        for p in Produto.query.order_by(Produto.descricao).all():
-            estoque = float(getattr(p, "estoque_atual", 0) or 0)
-            minimo = float(getattr(p, "estoque_minimo", 0) or 0)
-            if minimo > 0 and estoque <= minimo:
-                produtos_baixo.append(p)
-            elif minimo <= 0 and estoque <= 2:
-                produtos_baixo.append(p)
-        produtos_baixo = produtos_baixo[:8]
-    except Exception:
-        produtos_baixo = []
-
-    # Dados do gráfico — últimos 7 dias
-    labels_grafico = []
-    valores_grafico = []
-    for i in range(6, -1, -1):
-        dia = hoje - timedelta(days=i)
-        labels_grafico.append(dia.strftime("%d/%m"))
-        fat_dia = (
-            OrdemServico.query
-            .filter(func.date(OrdemServico.data_abertura) == dia)
-            .with_entities(func.coalesce(func.sum(OrdemServico.valor_total), 0))
-            .scalar()
-            or 0
-        )
-        valores_grafico.append(float(fat_dia))
-
-    try:
-        mecanicos = Mecanico.query.filter_by(ativo=True).order_by(Mecanico.nome).all()
-    except Exception:
-        mecanicos = []
-
-    # ========== NOVAS INFORMAÇÕES DO DASHBOARD ==========
-
-    # 1. Vendas Rápidas
-    try:
-        inicio_mes = hoje.replace(day=1)
-        vendas_rapidas_mes = (
-            VendaRapida.query
-            .filter(func.date(VendaRapida.criado_em) >= inicio_mes)
-            .with_entities(func.coalesce(func.sum(VendaRapida.valor_total), 0))
-            .scalar() or 0
-        )
-        vendas_rapidas_hoje = (
-            VendaRapida.query
-            .filter(func.date(VendaRapida.criado_em) == hoje)
-            .with_entities(func.coalesce(func.sum(VendaRapida.valor_total), 0))
-            .scalar() or 0
-        )
-    except Exception:
-        vendas_rapidas_mes = 0
-        vendas_rapidas_hoje = 0
-
-    # 2. Ticket médio
-    try:
-        qtd_os = query_os.count() or 1
-        ticket_medio = float(faturamento or 0) / qtd_os
-    except Exception:
-        ticket_medio = 0
-
-    # 3. OS abertas há mais de 7 dias
-    try:
-        limite = hoje - timedelta(days=7)
-        os_antigas = (
-            OrdemServico.query
-            .filter(OrdemServico.status == "ABERTA")
-            .filter(func.date(OrdemServico.data_abertura) <= limite)
-            .count()
-        )
-    except Exception:
-        os_antigas = 0
-
-    # 4. Próximas revisões
-    try:
-        revisoes = []
-        for v in Veiculo.query.order_by(Veiculo.proxima_revisao_data).all():
-            data_rev = getattr(v, "proxima_revisao_data", None)
-            km_rev = getattr(v, "proxima_revisao_km", None)
-            km_atual = getattr(v, "km", None) or 0
-
-            precisa = False
-            if data_rev and data_rev <= hoje + timedelta(days=30):
-                precisa = True
-            if km_rev and km_atual and (km_rev - km_atual) <= 1000:
-                precisa = True
-
-            if precisa:
-                cliente_nome = v.cliente.nome if getattr(v, "cliente", None) else "-"
-                revisoes.append({
-                    "placa": v.placa,
-                    "cliente": cliente_nome,
-                    "data": data_rev.strftime("%d/%m/%Y") if data_rev else "-",
-                    "km": km_rev or "-"
-                })
-        revisoes = revisoes[:6]
-    except Exception:
-        revisoes = []
-    # ========== LUCRO DAS PEÇAS ==========
-    try:
-        lucro_pecas_os = 0.0
-        lucro_pecas_venda = 0.0
-
-        # --- Lucro OS ---
-        query_itens_os = db.session.query(ItemOrdemServico).join(OrdemServico)
-        if periodo == "hoje":
-            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) == hoje)
-        elif periodo == "semana":
-            inicio_semana = hoje - timedelta(days=hoje.weekday())
-            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) >= inicio_semana)
-        elif periodo == "mes":
-            inicio_mes = hoje.replace(day=1)
-            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) >= inicio_mes)
-        elif periodo == "ano":
-            inicio_ano = hoje.replace(month=1, day=1)
-            query_itens_os = query_itens_os.filter(func.date(OrdemServico.data_abertura) >= inicio_ano)
-
-        for item in query_itens_os.all():
-            venda = float(item.valor_total or 0)
-            custo = float(item.custo_unitario or 0) * float(item.quantidade or 0)
-            lucro_pecas_os += (venda - custo)
-
-        # --- Lucro Venda Rápida ---
-        query_vr = db.session.query(ItemVendaRapida).join(VendaRapida)
-        if periodo == "hoje":
-            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) == hoje)
-        elif periodo == "semana":
-            inicio_semana = hoje - timedelta(days=hoje.weekday())
-            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) >= inicio_semana)
-        elif periodo == "mes":
-            inicio_mes = hoje.replace(day=1)
-            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) >= inicio_mes)
-        elif periodo == "ano":
-            inicio_ano = hoje.replace(month=1, day=1)
-            query_vr = query_vr.filter(func.date(VendaRapida.data_venda) >= inicio_ano)
-
-        for item in query_vr.all():
-            venda = float(item.valor_total or 0)
-            custo = float(item.custo_unitario or 0) * float(item.quantidade or 0)
-            lucro_pecas_venda += (venda - custo)
-
-        lucro_pecas_total = lucro_pecas_os + lucro_pecas_venda
+        if fat_mes_anterior > 0:
+            variacao_mes_pct = ((fat_mes_atual - fat_mes_anterior) / fat_mes_anterior) * 100
+        else:
+            variacao_mes_pct = 100.0 if fat_mes_atual > 0 else 0.0
+        variacao_mes_valor = fat_mes_atual - fat_mes_anterior
     except Exception as e:
-        print("Erro lucro peças:", e)
-        lucro_pecas_os = 0
-        lucro_pecas_venda = 0
-        lucro_pecas_total = 0
+        print("Erro comparativo mês:", e)
+        fat_mes_atual = fat_mes_anterior = variacao_mes_pct = variacao_mes_valor = 0.0
+            # ========== RODADA B: COMERCIAL + ESTOQUE + PESSOAS ==========
+    # --- Top 5 produtos mais vendidos (OS + Venda Rápida) ---
+    top_produtos = []
+    try:
+        from collections import defaultdict
+        mapa_prod = defaultdict(lambda: {"nome": "", "qtd": 0.0, "faturamento": 0.0})
+
+        for item in (
+            db.session.query(ItemOrdemServico)
+            .join(OrdemServico, ItemOrdemServico.ordem_servico_id == OrdemServico.id)
+            .filter(
+                OrdemServico.empresa_id == eid,
+                OrdemServico.data_abertura >= d_ini,
+                OrdemServico.data_abertura < d_fim,
+            )
+            .all()
+        ):
+            nome = getattr(item, "descricao", None) or "Item"
+            if getattr(item, "produto_id", None):
+                p = Produto.query.get(item.produto_id)
+                if p:
+                    nome = getattr(p, "descricao", None) or getattr(p, "nome", None) or nome
+            qtd = _f(getattr(item, "quantidade", 1) or 1)
+            fat = _f(getattr(item, "valor_total", 0))
+            if fat == 0:
+                fat = _f(getattr(item, "valor_unitario", 0)) * qtd
+            chave = nome.strip().upper()
+            mapa_prod[chave]["nome"] = nome
+            mapa_prod[chave]["qtd"] += qtd
+            mapa_prod[chave]["faturamento"] += fat
+
+        try:
+            for item in (
+                db.session.query(ItemVendaRapida)
+                .join(VendaRapida)
+                .filter(
+                    VendaRapida.empresa_id == eid,
+                    VendaRapida.data_venda >= d_ini,
+                    VendaRapida.data_venda < d_fim,
+                )
+                .all()
+            ):
+                nome = getattr(item, "descricao", None) or "Item"
+                if getattr(item, "produto_id", None):
+                    p = Produto.query.get(item.produto_id)
+                    if p:
+                        nome = getattr(p, "descricao", None) or getattr(p, "nome", None) or nome
+                qtd = _f(getattr(item, "quantidade", 1) or 1)
+                fat = _f(getattr(item, "valor_total", 0))
+                chave = nome.strip().upper()
+                mapa_prod[chave]["nome"] = nome
+                mapa_prod[chave]["qtd"] += qtd
+                mapa_prod[chave]["faturamento"] += fat
+        except Exception:
+            pass
+
+        top_produtos = sorted(mapa_prod.values(), key=lambda x: x["faturamento"], reverse=True)[:5]
+    except Exception as e:
+        print("Erro top produtos:", e)
+
+    # --- Estoque crítico (lista) ---
+    produtos_criticos = []
+    try:
+        for p in Produto.query.filter(Produto.empresa_id == eid).order_by(Produto.estoque_atual.asc()).limit(20).all():
+            estoque = _f(getattr(p, "estoque_atual", 0))
+            minimo = _f(getattr(p, "estoque_minimo", 5) or 5)
+            if estoque <= minimo:
+                produtos_criticos.append({
+                    "nome": getattr(p, "descricao", None) or getattr(p, "nome", None) or f"ID {p.id}",
+                    "estoque": estoque,
+                    "minimo": minimo,
+                })
+        produtos_criticos = produtos_criticos[:8]
+    except Exception as e:
+        print("Erro estoque crítico:", e)
+
+    # --- Margem média de peças (%) ---
+    try:
+        if (receita_estoque + receita_parceiro) > 0:
+            margem_pecas_pct = (lucro_pecas_total / (receita_estoque + receita_parceiro)) * 100
+        else:
+            margem_pecas_pct = 0.0
+    except Exception:
+        margem_pecas_pct = 0.0
+
+    # --- Top 5 clientes por faturamento ---
+    top_clientes = []
+    try:
+        mapa_cli = defaultdict(lambda: {"nome": "", "qtd_os": 0, "faturamento": 0.0})
+        for o in os_periodo:
+            cid = getattr(o, "cliente_id", None) or 0
+            nome = "Cliente"
+            if o.cliente:
+                nome = o.cliente.nome or nome
+            mapa_cli[cid]["nome"] = nome
+            mapa_cli[cid]["qtd_os"] += 1
+            mapa_cli[cid]["faturamento"] += _f(getattr(o, "valor_total", 0))
+        top_clientes = sorted(mapa_cli.values(), key=lambda x: x["faturamento"], reverse=True)[:5]
+    except Exception as e:
+        print("Erro top clientes:", e)
+
+    # --- Comissões estimadas dos mecânicos ---
+    comissoes = []
+    total_comissoes = 0.0
+    try:
+        mapa_com = defaultdict(lambda: {"nome": "", "os": 0, "comissao": 0.0})
+        for v in OrdemServicoMecanico.query.join(OrdemServico).filter(
+            OrdemServico.empresa_id == eid,
+            OrdemServico.data_abertura >= d_ini,
+            OrdemServico.data_abertura < d_fim,
+        ).all():
+            mid = v.mecanico_id or 0
+            mec = Mecanico.query.get(mid)
+            nome = mec.nome if mec else f"ID {mid}"
+            valor_com = _f(getattr(v, "comissao", 0) or getattr(v, "valor_comissao", 0))
+            if valor_com == 0:
+                # fallback: 10% do valor da OS se não tiver comissão cadastrada
+                o = v.ordem_servico
+                valor_com = _f(getattr(o, "valor_servicos", 0)) * 0.10
+            mapa_com[mid]["nome"] = nome
+            mapa_com[mid]["os"] += 1
+            mapa_com[mid]["comissao"] += valor_com
+        comissoes = sorted(mapa_com.values(), key=lambda x: x["comissao"], reverse=True)
+        total_comissoes = sum(c["comissao"] for c in comissoes)
+    except Exception as e:
+        print("Erro comissões:", e)
+
+    # --- Agendamentos hoje / amanhã ---
+    agendamentos_hoje = []
+    agendamentos_amanha = []
+    try:
+        amanha = hoje + timedelta(days=1)
+        for a in Agendamento.query.filter(Agendamento.empresa_id == eid).all():
+            data_ag = getattr(a, "data", None) or getattr(a, "data_agendamento", None)
+            if not data_ag:
+                continue
+            if hasattr(data_ag, "date"):
+                data_ag = data_ag.date()
+            cliente_nome = "-"
+            if getattr(a, "cliente_id", None):
+                c = Cliente.query.get(a.cliente_id)
+                if c:
+                    cliente_nome = c.nome
+            item = {
+                "hora": getattr(a, "hora", None) or getattr(a, "horario", "") or "",
+                "cliente": cliente_nome,
+                "placa": getattr(a, "placa", "") or "",
+                "obs": getattr(a, "observacao", None) or getattr(a, "observacoes", "") or "",
+            }
+            if data_ag == hoje:
+                agendamentos_hoje.append(item)
+            elif data_ag == amanha:
+                agendamentos_amanha.append(item)
+    except Exception as e:
+        print("Erro agendamentos:", e)
 
     return render_template(
         "dashboard.html",
+        data_ini=data_ini,
+        data_fim=data_fim,
         total_clientes=total_clientes,
         total_veiculos=total_veiculos,
-        total_os=total_ordens,
-        faturamento=faturamento,
-        mecanicos=mecanicos,
-        periodo=periodo,
-        data_inicio=data_inicio,
-        data_fim=data_fim,
-        ordens_andamento=ordens_andamento,
-        contas_receber=contas_receber,
-        ultimas_ordens=ultimas_ordens,
-        veiculos_atendimento=veiculos_atendimento,
-        produtos_baixo=produtos_baixo,
-        labels_grafico=labels_grafico,
-        valores_grafico=valores_grafico,
-                vendas_rapidas_mes=vendas_rapidas_mes,
-        vendas_rapidas_hoje=vendas_rapidas_hoje,
-        ticket_medio=ticket_medio,
+        total_os=total_os,
+        os_abertas=os_abertas,
+        os_concluidas=os_concluidas,
         os_antigas=os_antigas,
-        revisoes=revisoes,
+        os_retrabalho=os_retrabalho,
+        faturamento_os=faturamento_os,
+        faturamento_vendas=faturamento_vendas,
+        faturamento_total=faturamento_total,
+        qtd_vendas=qtd_vendas,
+        ticket_medio=ticket_medio,
+        receita_servicos=receita_servicos,
+        receita_pecas_os=receita_pecas_os,
+        receita_estoque=receita_estoque,
+        receita_parceiro=receita_parceiro,
+        custo_estoque=custo_estoque,
+        custo_parceiro=custo_parceiro,
+        lucro_estoque=lucro_estoque,
+        lucro_parceiro=lucro_parceiro,
         lucro_pecas_total=lucro_pecas_total,
-        lucro_pecas_os=lucro_pecas_os,
-        lucro_pecas_venda=lucro_pecas_venda,
+        lucro_servicos=lucro_servicos,
+        lucro_geral=lucro_geral,
+        gastos_compras=gastos_compras,
+        resultado=resultado,
+        estoque_baixo=estoque_baixo,
+        ranking=ranking,
+        os_recentes=os_recentes,
+        labels_status=labels_status,
+        valores_status=valores_status,
+        labels_meses=labels_meses,
+        valores_meses=valores_meses,
+                receber_vencidas=receber_vencidas,
+        receber_7=receber_7,
+        receber_30=receber_30,
+        receber_total_pendente=receber_total_pendente,
+        pagar_vencidas=pagar_vencidas,
+        pagar_7=pagar_7,
+        pagar_30=pagar_30,
+        pagar_total_pendente=pagar_total_pendente,
+        caixa_entradas=caixa_entradas,
+        caixa_saidas=caixa_saidas,
+        caixa_saldo=caixa_saldo,
+        inadimplencia_valor=inadimplencia_valor,
+        inadimplencia_pct=inadimplencia_pct,
+        os_paradas_7=os_paradas_7,
+        os_paradas_15=os_paradas_15,
+        valor_preso_7=valor_preso_7,
+        valor_preso_15=valor_preso_15,
+        fat_mes_atual=fat_mes_atual,
+        fat_mes_anterior=fat_mes_anterior,
+        variacao_mes_pct=variacao_mes_pct,
+        variacao_mes_valor=variacao_mes_valor,
+        top_produtos=top_produtos,
+        produtos_criticos=produtos_criticos,
+        margem_pecas_pct=margem_pecas_pct,
+        top_clientes=top_clientes,
+        comissoes=comissoes,
+        total_comissoes=total_comissoes,
+        agendamentos_hoje=agendamentos_hoje,
+        agendamentos_amanha=agendamentos_amanha,
     )
 
+
+@app.route("/ordens/retrabalho/<int:id>", methods=["POST"])
+@login_required
+def abrir_retrabalho(id):
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    origem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first()
+    if not origem:
+        return redirect("/ordens")
+    try:
+        ano = date.today().year
+        prefixo = ano * 10000
+        ultimo = db.session.query(func.max(OrdemServico.numero)).scalar() or 0
+        numero = prefixo + 1 if ultimo < prefixo else ultimo + 1
+        nova = OrdemServico(
+            numero=numero,
+            cliente_id=origem.cliente_id,
+            veiculo_id=origem.veiculo_id,
+            km=getattr(origem, "km", None),
+            status="RETRABALHO",
+            data_abertura=datetime.now(),
+            empresa_id=eid,
+            mecanico_id=getattr(origem, "mecanico_id", None),
+            mecanico=getattr(origem, "mecanico", None),
+            os_origem_id=origem.id,
+            is_retrabalho=True,
+            defeito_relatado=f"RETRABALHO da OS {origem.numero or origem.id}",
+            valor_servicos=0,
+            valor_produtos=0,
+            desconto=0,
+            valor_total=0,
+        )
+        db.session.add(nova)
+        db.session.commit()
+        return redirect(f"/ordens/editar/{nova.id}")
+    except Exception as e:
+        db.session.rollback()
+        print("Erro retrabalho:", e)
+        return redirect(f"/ordens/editar/{origem.id}")
 
 @app.route("/clientes")
 @login_required
 def clientes():
-    lista_clientes = Cliente.query.order_by(Cliente.nome).all()
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    lista_clientes = Cliente.query.filter_by(empresa_id=eid).order_by(Cliente.nome).all()
     return render_template("clientes.html", clientes=lista_clientes)
 
 
@@ -541,13 +979,17 @@ def novo_cliente():
     if request.method == "POST":
         cpf = (request.form.get("cpf_cnpj") or "").strip()
         if cpf:
-            existente = Cliente.query.filter(Cliente.cpf_cnpj == cpf).first()
+            eid = empresa_atual()
+            existente = Cliente.query.filter(
+                Cliente.cpf_cnpj == cpf,
+                Cliente.empresa_id == eid
+            ).first()
             if existente:
                 return redirect(f"/clientes/editar/{existente.id}?aviso=cpf_existente")
 
         data_nasc = request.form.get("data_nascimento")
         cliente = Cliente(
-            empresa_id=session.get("empresa_id") or 1,
+            empresa_id=empresa_atual() or 1,
             nome=request.form.get("nome"),
             cpf_cnpj=cpf or None,
             telefone=request.form.get("telefone"),
@@ -568,7 +1010,11 @@ def novo_cliente():
 @app.route("/clientes/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_cliente(id):
-    cliente = Cliente.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    cliente = Cliente.query.filter_by(id=id, empresa_id=eid).first_or_404()
+
     if request.method == "POST":
         data_nasc = request.form.get("data_nascimento")
         cliente.nome = request.form.get("nome")
@@ -577,26 +1023,35 @@ def editar_cliente(id):
         cliente.whatsapp = request.form.get("whatsapp")
         cliente.email = request.form.get("email")
         cliente.endereco = request.form.get("endereco")
-        cliente.cidade = request.form.get("cidade")
-        cliente.estado = request.form.get("estado")
-        cliente.observacoes = request.form.get("observacoes")
-        cliente.data_nascimento = datetime.strptime(data_nasc, "%Y-%m-%d").date() if data_nasc else None
+        if data_nasc:
+            try:
+                cliente.data_nascimento = datetime.strptime(data_nasc, "%Y-%m-%d").date()
+            except Exception:
+                pass
         db.session.commit()
         return redirect("/clientes")
-    return render_template("novo_cliente.html", cliente=cliente, aviso=request.args.get("aviso"))
+
+    return render_template("editar_cliente.html", cliente=cliente)
 
 
 @app.route("/clientes/excluir/<int:id>")
 @login_required
 def excluir_cliente(id):
-    cliente = Cliente.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    cliente = Cliente.query.filter_by(id=id, empresa_id=eid).first_or_404()
     db.session.delete(cliente)
     db.session.commit()
     return redirect("/clientes")
+
 @app.route("/veiculos")
 @login_required
 def veiculos():
-    lista_veiculos = Veiculo.query.order_by(Veiculo.placa).all()
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    lista_veiculos = Veiculo.query.filter_by(empresa_id=eid).order_by(Veiculo.placa).all()
     return render_template("veiculos.html", veiculos=lista_veiculos)
 
 
@@ -606,7 +1061,10 @@ def novo_veiculo():
     if request.method == "POST":
         placa = request.form["placa"].upper().strip()
 
-        existente = Veiculo.query.filter(Veiculo.placa == placa).first()
+        existente = Veiculo.query.filter(
+            Veiculo.placa == placa,
+            Veiculo.empresa_id == (empresa_atual() or 1)
+        ).first()
         if existente:
             return redirect(f"/veiculos/editar/{existente.id}?aviso=placa_existente")
 
@@ -614,7 +1072,7 @@ def novo_veiculo():
         km_rev = request.form.get("proxima_revisao_km")
 
         veiculo = Veiculo(
-            empresa_id=session.get("empresa_id") or 1,
+            empresa_id=empresa_atual() or 1,
             cliente_id=int(request.form["cliente_id"]),
             placa=placa,
             marca=request.form.get("marca"),
@@ -632,14 +1090,22 @@ def novo_veiculo():
         db.session.add(veiculo)
         db.session.commit()
         return redirect("/veiculos")
-    clientes = Cliente.query.order_by(Cliente.nome).all()
+    eid = empresa_atual()
+    clientes = (
+        Cliente.query.filter_by(empresa_id=eid)
+        .order_by(Cliente.nome)
+        .all()
+    )
     return render_template("novo_veiculo.html", clientes=clientes)
 
 
 @app.route("/veiculos/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_veiculo(id):
-    veiculo = Veiculo.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    veiculo = Veiculo.query.filter_by(id=id, empresa_id=eid).first_or_404()
     aviso = request.args.get("aviso")
 
     if request.method == "POST":
@@ -662,19 +1128,26 @@ def editar_veiculo(id):
         db.session.commit()
         return redirect("/veiculos")
 
-    clientes = Cliente.query.order_by(Cliente.nome).all()
+    clientes = (
+        Cliente.query.filter_by(empresa_id=eid)
+        .order_by(Cliente.nome)
+        .all()
+    )
     return render_template(
         "novo_veiculo.html",
         veiculo=veiculo,
         clientes=clientes,
-        aviso=aviso
+        aviso=aviso,
     )
 
 
 @app.route("/veiculos/excluir/<int:id>")
 @login_required
 def excluir_veiculo(id):
-    veiculo = Veiculo.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    veiculo = Veiculo.query.filter_by(id=id, empresa_id=eid).first_or_404()
     db.session.delete(veiculo)
     db.session.commit()
     return redirect("/veiculos")
@@ -686,12 +1159,16 @@ def excluir_veiculo(id):
 @app.route("/ordens")
 @login_required
 def ordens():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
     periodo = request.args.get("periodo")
     data_inicio = request.args.get("data_inicio")
     data_fim = request.args.get("data_fim")
     status = request.args.get("status")
 
-    query = OrdemServico.query
+    query = OrdemServico.query.filter_by(empresa_id=eid)
     hoje = date.today()
 
     if periodo == "hoje":
@@ -749,12 +1226,11 @@ def ordens_por_placa():
             placa_digitada=placa
         )
 
-        veiculo = None
-    for v in Veiculo.query.all():
-        placa_banco = (v.placa or "").replace("-", "").replace(" ", "").upper()
-        if placa_banco == placa:
-            veiculo = v
-            break
+    placa_limpa = placa.replace("-", "").replace(" ", "")
+    veiculo = Veiculo.query.filter(
+        Veiculo.empresa_id == eid,
+        db.func.replace(db.func.replace(Veiculo.placa, "-", ""), " ", "") == placa_limpa
+    ).first()
 
     if not veiculo:
         return render_template(
@@ -764,7 +1240,6 @@ def ordens_por_placa():
             mostrar_botao_cadastro=True,
             placa_digitada=placa
         )
-
     try:
         ano = date.today().year
         prefixo = ano * 10000
@@ -1064,18 +1539,25 @@ def nova_ordem():
         db.session.commit()
         return redirect("/ordens")
 
-    clientes = Cliente.query.order_by(Cliente.nome).all()
-    veiculos = Veiculo.query.order_by(Veiculo.placa).all()
+        eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
+    clientes = Cliente.query.filter_by(empresa_id=eid).order_by(Cliente.nome).all()
+    veiculos = Veiculo.query.filter_by(empresa_id=eid).order_by(Veiculo.placa).all()
+
     try:
-        lista_mecanicos = Mecanico.query.filter_by(ativo=True).order_by(Mecanico.nome).all()
+        lista_mecanicos = Mecanico.query.filter_by(empresa_id=eid, ativo=True).order_by(Mecanico.nome).all()
     except Exception:
         lista_mecanicos = []
+
     try:
-        lista_produtos = Produto.query.order_by(Produto.descricao).all()
+        lista_produtos = Produto.query.filter_by(empresa_id=eid).order_by(Produto.descricao).all()
     except Exception:
         lista_produtos = []
+
     try:
-        lista_fornecedores = Fornecedor.query.order_by(Fornecedor.razao_social).all()
+        lista_fornecedores = Fornecedor.query.filter_by(empresa_id=eid).order_by(Fornecedor.razao_social).all()
     except Exception:
         lista_fornecedores = []
 
@@ -1092,8 +1574,12 @@ def nova_ordem():
 @app.route("/ordens/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_ordem(id):
-    ordem = OrdemServico.query.get_or_404(id)
-        # BLOQUEIA EDIÇÃO SE JÁ ESTIVER FINALIZADA
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
+
+    # BLOQUEIA EDIÇÃO SE JÁ ESTIVER FINALIZADA
     if ordem.status == "FINALIZADA":
         return redirect("/ordens")
 
@@ -1254,14 +1740,20 @@ def editar_ordem(id):
         db.session.commit()
         return redirect("/ordens")
 
-    clientes = Cliente.query.order_by(Cliente.nome).all()
-    veiculos = Veiculo.query.order_by(Veiculo.placa).all()
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
+    clientes = Cliente.query.filter_by(empresa_id=eid).order_by(Cliente.nome).all()
+    veiculos = Veiculo.query.filter_by(empresa_id=eid).order_by(Veiculo.placa).all()
+
     try:
-        mecanicos = Mecanico.query.filter_by(ativo=True).order_by(Mecanico.nome).all()
+        mecanicos = Mecanico.query.filter_by(empresa_id=eid, ativo=True).order_by(Mecanico.nome).all()
     except Exception:
         mecanicos = []
+
     try:
-        produtos = Produto.query.order_by(Produto.descricao).all()
+        produtos = Produto.query.filter_by(empresa_id=eid).order_by(Produto.descricao).all()
     except Exception:
         produtos = []
 
@@ -1280,10 +1772,14 @@ def editar_ordem(id):
     )
 
 
+
 @app.route("/ordens/finalizar/<int:id>")
 @login_required
 def finalizar_ordem(id):
-    ordem = OrdemServico.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     ordem.status = "FINALIZADA"
     db.session.commit()
     return redirect("/ordens")
@@ -1292,7 +1788,10 @@ def finalizar_ordem(id):
 @app.route("/ordens/excluir/<int:id>")
 @login_required
 def excluir_ordem(id):
-    ordem = OrdemServico.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
 
     # Apaga primeiro tudo que está ligado à ordem
     OrdemServicoMecanico.query.filter_by(ordem_servico_id=ordem.id).delete()
@@ -1307,9 +1806,21 @@ def excluir_ordem(id):
 @app.route("/ordens/pdf/<int:id>")
 @login_required
 def pdf_ordem(id):
-    ordem = OrdemServico.query.get_or_404(id)
-    pdf = gerar_pdf_ordem(ordem)
-    return send_file(pdf, download_name=f"OS_{ordem.numero}.pdf", as_attachment=False, mimetype="application/pdf")
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
+    try:
+        pdf = gerar_pdf_ordem(ordem)
+        return send_file(
+            pdf,
+            download_name=f"OS_{ordem.numero or ordem.id}.pdf",
+            as_attachment=False,
+            mimetype="application/pdf",
+        )
+    except Exception as e:
+        print("Erro PDF ordem:", e)
+        return f"<h1>OS #{ordem.numero or ordem.id}</h1><p>Total: R$ {ordem.valor_total or 0}</p>"
 
 
 @app.route("/api/veiculos/<int:cliente_id>")
@@ -1322,21 +1833,14 @@ def api_veiculos(cliente_id):
     ])
 
 
-@app.route("/dashboard/dados")
-@login_required
-def dashboard_dados():
-    total_clientes = Cliente.query.count()
-    total_veiculos = Veiculo.query.count()
-    total_ordens = OrdemServico.query.count()
-    faturamento = db.session.query(db.func.sum(OrdemServico.valor_total)).scalar() or 0
-    return jsonify({"clientes": total_clientes, "veiculos": total_veiculos, "ordens": total_ordens, "faturamento": faturamento})
-
-
 @app.route("/estoque")
 @login_required
 def estoque():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     try:
-        lista_produtos = Produto.query.order_by(Produto.descricao).all()
+        lista_produtos = Produto.query.filter_by(empresa_id=eid).order_by(Produto.descricao).all()
     except Exception:
         lista_produtos = []
     try:
@@ -1380,7 +1884,10 @@ def estoque():
 @app.route("/produtos")
 @login_required
 def produtos():
-    return redirect("/estoque")
+        eid = empresa_atual()
+        if not eid:
+           return redirect("/login")
+        return redirect("/estoque")
 
 
 @app.route("/produtos/novo", methods=["GET", "POST"])
@@ -1397,7 +1904,7 @@ def novo_produto():
                 preco_venda=float(request.form.get("preco_venda") or 0),
                 ativo=True,
             )
-            produto.empresa_id = 1
+            produto.empresa_id = empresa_atual() or 1
             produto.categoria_id = int(request.form.get("categoria_id") or 1)
             if request.form.get("fabricante_id"):
                 produto.fabricante_id = int(request.form.get("fabricante_id"))
@@ -1432,7 +1939,11 @@ def novo_produto():
 @app.route("/produtos/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_produto(id):
-    produto = Produto.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    produto = Produto.query.filter_by(id=id, empresa_id=eid).first_or_404()
+
     if request.method == "POST":
         try:
             produto.codigo = (request.form.get("codigo") or "").strip() or None
@@ -1468,7 +1979,10 @@ def editar_produto(id):
 @app.route("/produtos/excluir/<int:id>")
 @login_required
 def excluir_produto(id):
-    produto = Produto.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    produto = Produto.query.filter_by(id=id, empresa_id=eid).first_or_404()
     try:
         db.session.delete(produto)
         db.session.commit()
@@ -1524,8 +2038,11 @@ def nova_categoria():
 @app.route("/categorias/excluir/<int:id>")
 @login_required
 def excluir_categoria(id):
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     try:
-        cat = Categoria.query.get_or_404(id)
+        cat = Categoria.query.filter_by(id=id, empresa_id=eid).first_or_404()
         db.session.delete(cat)
         db.session.commit()
     except Exception as e:
@@ -1573,7 +2090,7 @@ def novo_fabricante():
 @login_required
 def excluir_fabricante(id):
     try:
-        fab = Fabricante.query.get_or_404(id)
+        fab = Fabricante.query.filter_by(id=id, empresa_id=eid).first_or_404()
         db.session.delete(fab)
         db.session.commit()
     except Exception as e:
@@ -1585,8 +2102,12 @@ def excluir_fabricante(id):
 @app.route("/fornecedores")
 @login_required
 def fornecedores():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
     try:
-        lista = Fornecedor.query.order_by(Fornecedor.razao_social).all()
+        lista = Fornecedor.query.filter_by(empresa_id=eid).order_by(Fornecedor.razao_social).all()
     except Exception:
         lista = []
     return render_template("fornecedores.html", fornecedores=lista)
@@ -1609,7 +2130,7 @@ def novo_fornecedor():
 
             forn = Fornecedor()
             if hasattr(forn, "empresa_id"):
-                forn.empresa_id = 1
+                forn.empresa_id = empresa_atual() or 1
             if hasattr(forn, "razao_social"):
                 forn.razao_social = razao
             if hasattr(forn, "nome_fantasia"):
@@ -1657,8 +2178,11 @@ def novo_fornecedor():
 @app.route("/fornecedores/excluir/<int:id>")
 @login_required
 def excluir_fornecedor(id):
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     try:
-        forn = Fornecedor.query.get_or_404(id)
+        forn = Fornecedor.query.filter_by(id=id, empresa_id=eid).first_or_404()
         db.session.delete(forn)
         db.session.commit()
     except Exception as e:
@@ -1670,8 +2194,12 @@ def excluir_fornecedor(id):
 @app.route("/compras")
 @login_required
 def compras():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
     try:
-        lista = Compra.query.order_by(Compra.id.desc()).all()
+        lista = Compra.query.filter_by(empresa_id=eid).order_by(Compra.id.desc()).all()
     except Exception:
         lista = []
     valor_compras = 0
@@ -1764,7 +2292,7 @@ def salvar_compra():
 
         compra = Compra()
         if hasattr(compra, "empresa_id"):
-            compra.empresa_id = 1
+            compra.empresa_id = empresa_atual() or 1
         if hasattr(compra, "fornecedor_id"):
             compra.fornecedor_id = fornecedor_id
         if hasattr(compra, "numero_nf"):
@@ -1818,7 +2346,7 @@ def salvar_compra():
 @app.route("/compras/ver/<int:id>")
 @login_required
 def ver_compra(id):
-    compra = Compra.query.get_or_404(id)
+    compra = Compra.query.filter_by(id=id, empresa_id=eid).first_or_404()
     try:
         itens = ItemCompra.query.filter_by(compra_id=id).all()
     except Exception:
@@ -1830,7 +2358,7 @@ def ver_compra(id):
 @login_required
 def excluir_compra(id):
     try:
-        compra = Compra.query.get_or_404(id)
+        compra = Compra.query.filter_by(id=id, empresa_id=eid).first_or_404()
         try:
             ItemCompra.query.filter_by(compra_id=id).delete()
         except Exception:
@@ -1926,7 +2454,11 @@ def financeiro():
 @app.route("/usuarios")
 @login_required
 def usuarios():
-    lista = Usuario.query.order_by(Usuario.nome).all()
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
+    lista = Usuario.query.filter_by(empresa_id=eid).order_by(Usuario.nome).all()
     return render_template("usuarios.html", usuarios=lista)
 
 
@@ -1961,7 +2493,7 @@ def novo_usuario():
 @app.route("/usuarios/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_usuario(id):
-    usuario = Usuario.query.get_or_404(id)
+    usuario = Usuario.query.filter_by(id=id, empresa_id=eid).first_or_404()
     if request.method == "POST":
         try:
             usuario.nome = request.form.get("nome")
@@ -1984,7 +2516,7 @@ def editar_usuario(id):
 @app.route("/usuarios/resetar-senha/<int:id>")
 @login_required
 def resetar_senha(id):
-    usuario = Usuario.query.get_or_404(id)
+    usuario = Usuario.query.filter_by(id=id, empresa_id=eid).first_or_404()
     usuario.senha = generate_password_hash("123456")
     db.session.commit()
     return redirect("/usuarios")
@@ -1995,7 +2527,7 @@ def resetar_senha(id):
 def excluir_usuario(id):
     if id == session.get("usuario_id"):
         return redirect("/usuarios")
-    usuario = Usuario.query.get_or_404(id)
+    usuario = Usuario.query.filter_by(id=id, empresa_id=eid).first_or_404()
     db.session.delete(usuario)
     db.session.commit()
     return redirect("/usuarios")
@@ -2104,10 +2636,10 @@ def configuracoes():
 @app.route("/mecanicos")
 @login_required
 def mecanicos():
-    try:
-        lista = Mecanico.query.order_by(Mecanico.nome).all()
-    except Exception:
-        lista = []
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    lista = Mecanico.query.filter_by(empresa_id=eid).order_by(Mecanico.nome).all()
     return render_template("mecanicos.html", mecanicos=lista)
 
 
@@ -2117,6 +2649,7 @@ def novo_mecanico():
     if request.method == "POST":
         try:
             m = Mecanico(
+                empresa_id=empresa_atual() or 1,
                 nome=request.form.get("nome"),
                 telefone=request.form.get("telefone"),
                 whatsapp=request.form.get("whatsapp"),
@@ -2143,7 +2676,7 @@ def novo_mecanico():
 @app.route("/mecanicos/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_mecanico(id):
-    mecanico = Mecanico.query.get_or_404(id)
+    mecanico = Mecanico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     if request.method == "POST":
         try:
             mecanico.nome = request.form.get("nome")
@@ -2170,7 +2703,10 @@ def editar_mecanico(id):
 @app.route("/mecanicos/excluir/<int:id>")
 @login_required
 def excluir_mecanico(id):
-    m = Mecanico.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    m = Mecanico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     db.session.delete(m)
     db.session.commit()
     return redirect("/mecanicos")
@@ -2250,7 +2786,7 @@ def api_agenda_criar():
 @app.route("/api/agenda/atualizar/<int:id>", methods=["POST"])
 @login_required
 def api_agenda_atualizar(id):
-    ag = Agendamento.query.get_or_404(id)
+    ag = Agendamento.query.filter_by(id=id, empresa_id=eid).first_or_404()
     data = request.get_json(silent=True) or {}
     if "duracao_min" in data:
         try:
@@ -2281,7 +2817,7 @@ def api_agenda_atualizar(id):
 @app.route("/api/agenda/excluir/<int:id>", methods=["POST"])
 @login_required
 def api_agenda_excluir(id):
-    ag = Agendamento.query.get_or_404(id)
+    ag = Agendamento.query.filter_by(id=id, empresa_id=eid).first_or_404()
     db.session.delete(ag)
     db.session.commit()
     return jsonify({"ok": True})
@@ -2294,7 +2830,10 @@ def offline_page():
 
 @app.route("/api/offline/clientes")
 def api_offline_clientes():
-    lista = Cliente.query.order_by(Cliente.nome).all()
+    eid = session.get("empresa_id")
+    if not eid:
+        return jsonify([])
+    lista = Cliente.query.filter_by(empresa_id=eid).order_by(Cliente.nome).all()
     return jsonify([{
         "id": c.id, "nome": c.nome,
         "cpf_cnpj": getattr(c, "cpf_cnpj", None),
@@ -2308,7 +2847,10 @@ def api_offline_clientes():
 
 @app.route("/api/offline/veiculos")
 def api_offline_veiculos():
-    lista = Veiculo.query.order_by(Veiculo.placa).all()
+    eid = session.get("empresa_id")
+    if not eid:
+        return jsonify([])
+    lista = Veiculo.query.filter_by(empresa_id=eid).order_by(Veiculo.placa).all()
     return jsonify([{
         "id": v.id, "cliente_id": v.cliente_id, "placa": v.placa,
         "marca": getattr(v, "marca", None), "modelo": getattr(v, "modelo", None),
@@ -2318,14 +2860,16 @@ def api_offline_veiculos():
 
 @app.route("/api/offline/produtos")
 def api_offline_produtos():
+    eid = session.get("empresa_id")
+    if not eid:
+        return jsonify([])
     try:
-        lista = Produto.query.order_by(Produto.descricao).all()
+        lista = Produto.query.filter_by(empresa_id=eid).order_by(Produto.descricao).all()
         return jsonify([{
             "id": p.id,
             "codigo": getattr(p, "codigo", None),
             "descricao": getattr(p, "descricao", None),
             "estoque_atual": float(getattr(p, "estoque_atual", 0) or 0),
-            "preco_venda": float(getattr(p, "preco_venda", 0) or 0),
             "ativo": getattr(p, "ativo", True),
         } for p in lista])
     except Exception:
@@ -2334,17 +2878,16 @@ def api_offline_produtos():
 
 @app.route("/api/offline/ordens")
 def api_offline_ordens():
-    lista = OrdemServico.query.order_by(OrdemServico.data_abertura.desc()).limit(200).all()
+    eid = session.get("empresa_id")
+    if not eid:
+        return jsonify([])
+    lista = OrdemServico.query.filter_by(empresa_id=eid).order_by(OrdemServico.data_abertura.desc()).all()
     return jsonify([{
         "id": o.id,
         "numero": o.numero,
         "cliente_id": o.cliente_id,
         "veiculo_id": o.veiculo_id,
         "status": o.status,
-        "km": getattr(o, "km", None),
-        "defeito_relatado": getattr(o, "defeito_relatado", None),
-        "valor_total": float(getattr(o, "valor_total", 0) or 0),
-        "data_abertura": o.data_abertura.isoformat() if o.data_abertura else None,
     } for o in lista])
 # ============================================================
 # API - BUSCA PRODUTO POR CÓDIGO DE BARRAS (BIPE)
@@ -2413,7 +2956,7 @@ def entrada_rapida():
             if produto_id <= 0 or quantidade <= 0:
                 return redirect("/estoque/entrada-rapida")
 
-            produto = Produto.query.get_or_404(produto_id)
+            produto = Produto.query.filter_by(id=produto_id, empresa_id=eid).first_or_404()
             atual = float(getattr(produto, "estoque_atual", 0) or 0)
             produto.estoque_atual = atual + quantidade
 
@@ -2545,39 +3088,58 @@ def venda_rapida():
             print("Erro venda rápida:", e)
             return redirect("/venda-rapida")
 
-    clientes = Cliente.query.order_by(Cliente.nome).all()
+    # ===== GET =====
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
+    clientes = Cliente.query.filter_by(empresa_id=eid).order_by(Cliente.nome).all()
     return render_template("venda_rapida.html", clientes=clientes)
 
 
 @app.route("/vendas-rapidas")
 @login_required
 def listar_vendas_rapidas():
-    vendas = VendaRapida.query.order_by(VendaRapida.id.desc()).limit(100).all()
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
+    vendas = VendaRapida.query.filter_by(empresa_id=eid).order_by(VendaRapida.id.desc()).limit(100).all()
     return render_template("vendas_rapidas.html", vendas=vendas)
 
 
 @app.route("/ordens/pdf/<int:id>")
 @login_required
 def ordem_pdf(id):
-    ordem = OrdemServico.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     try:
         from pdf_ordem import gerar_pdf_ordem
         pdf = gerar_pdf_ordem(ordem)
-        return send_file(pdf, as_attachment=False, download_name=f"OS_{ordem.numero or ordem.id}.pdf")
+        return send_file(
+            pdf,
+            as_attachment=False,
+            download_name=f"OS_{ordem.numero or ordem.id}.pdf",
+        )
     except Exception as e:
         print("Erro PDF ordem:", e)
-        return f"<h1>OS #{ordem.numero or ordem.id}</h1><p>Cliente: {ordem.cliente.nome if ordem.cliente else '-'}</p><p>Total: R$ {ordem.valor_total or 0}</p>"
+        return f"<h1>OS #{ordem.numero or ordem.id}</h1><p>Total: R$ {ordem.valor_total or 0}</p>"
 
 
 @app.route("/lembretes")
 @login_required
 def lembretes():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     hoje = date.today()
     ano = hoje.year
 
     aniversariantes = []
     try:
-        for c in Cliente.query.all():
+        for c in Cliente.query.filter_by(empresa_id=eid).all():
             dn = getattr(c, "data_nascimento", None)
             if dn and dn.month == hoje.month and dn.day == hoje.day:
                 envio = LembreteEnvio.query.filter_by(
@@ -2597,7 +3159,7 @@ def lembretes():
 
     revisoes = []
     try:
-        for v in Veiculo.query.all():
+        for v in Veiculo.query.filter_by(empresa_id=eid).all():
             data_rev = getattr(v, "proxima_revisao_data", None)
             km_rev = getattr(v, "proxima_revisao_km", None)
             km_atual = getattr(v, "km", None) or 0
@@ -2755,12 +3317,15 @@ def lembretes_marcar_enviado():
 @app.context_processor
 def inject_lembretes_pendentes():
     try:
+        eid = session.get("empresa_id")
+        if not eid:
+            return {"lembretes_pendentes": 0}
         hoje = date.today()
         ano = hoje.year
         pendentes = 0
 
         # Aniversários não enviados
-        for c in Cliente.query.all():
+        for c in Cliente.query.filter_by(empresa_id=eid).all():
             dn = getattr(c, "data_nascimento", None)
             if dn and dn.month == hoje.month and dn.day == hoje.day:
                 envio = LembreteEnvio.query.filter_by(
@@ -2770,7 +3335,7 @@ def inject_lembretes_pendentes():
                     pendentes += 1
 
         # Revisões não dispensadas
-        for v in Veiculo.query.all():
+        for v in Veiculo.query.filter_by(empresa_id=eid).all():
             data_rev = getattr(v, "proxima_revisao_data", None)
             km_rev = getattr(v, "proxima_revisao_km", None)
             km_atual = getattr(v, "km", None) or 0
@@ -2795,14 +3360,20 @@ def inject_lembretes_pendentes():
 @app.route("/ordens/<int:id>/nfse")
 @login_required
 def ordem_nfse(id):
-    ordem = OrdemServico.query.get_or_404(id)
-    empresa = Empresa.query.first()
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
+    empresa = Empresa.query.filter_by(id=eid).first()
     return render_template("ordem_nfse.html", ordem=ordem, empresa=empresa)
 @app.route("/vendas-rapidas/<int:id>/nfse")
 @login_required
 def venda_rapida_nfse(id):
-    venda = VendaRapida.query.get_or_404(id)
-    empresa = Empresa.query.first()
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    venda = VendaRapida.query.filter_by(id=id, empresa_id=eid).first_or_404()
+    empresa = Empresa.query.filter_by(id=eid).first()
     return render_template("venda_rapida_nfse.html", venda=venda, empresa=empresa)
 # ============================================================
 # CHECKLIST DO VEÍCULO
@@ -2814,10 +3385,14 @@ def uploaded_file(filename):
     import os
     return send_from_directory(os.path.join(app.root_path, "uploads"), filename)
 
+
 @app.route("/ordens/<int:id>/checklist", methods=["GET", "POST"])
 @login_required
 def checklist_veiculo(id):
-    ordem = OrdemServico.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     checklist = ChecklistVeiculo.query.filter_by(ordem_servico_id=id).first()
 
     if request.method == "POST":
@@ -2826,7 +3401,6 @@ def checklist_veiculo(id):
                 checklist = ChecklistVeiculo(ordem_servico_id=id)
                 db.session.add(checklist)
 
-            # Itens do checklist
             itens = [
                 "farois", "lanternas", "setas", "pneus", "lataria",
                 "para_choques", "vidros", "retrovisores", "interior",
@@ -2839,7 +3413,6 @@ def checklist_veiculo(id):
             checklist.observacoes = request.form.get("observacoes")
             checklist.assinatura = request.form.get("assinatura") or checklist.assinatura
 
-            # Upload de fotos
             fotos_salvas = []
             if checklist.fotos:
                 fotos_salvas = checklist.fotos.split(",")
@@ -2870,23 +3443,26 @@ def checklist_veiculo(id):
         ordem=ordem,
         checklist=checklist
     )
+
+
 @app.route("/ordens/<int:id>/checklist/pdf")
 @login_required
 def checklist_pdf(id):
     from flask import make_response
-    ordem = OrdemServico.query.get_or_404(id)
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     checklist = ChecklistVeiculo.query.filter_by(ordem_servico_id=id).first()
-    empresa = Empresa.query.first()
+    empresa = Empresa.query.filter_by(id=eid).first()
 
     if not checklist:
         return "Checklist ainda não foi preenchido", 404
 
-    # Monta as fotos organizadas
     fotos_html = ""
     if checklist.fotos:
         labels = ["Frente", "Traseira", "Lateral Esquerda", "Lateral Direita", "Painel / Interior"]
         fotos = [f.strip() for f in checklist.fotos.split(",") if f.strip()]
-        
         fotos_html += '<div style="display:flex; flex-wrap:wrap; gap:15px; margin-top:10px;">'
         for i, foto in enumerate(fotos):
             label = labels[i] if i < len(labels) else f"Foto {i+1}"
@@ -2908,38 +3484,21 @@ def checklist_pdf(id):
             body {{ font-family: Arial, sans-serif; font-size: 13px; margin: 30px; color: #222; }}
             h1 {{ font-size: 20px; margin-bottom: 5px; color: #111; }}
             .header {{ border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }}
-            .info {{ line-height: 1.6; margin-bottom: 20px; }}
             table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
             th, td {{ border: 1px solid #444; padding: 7px 10px; text-align: left; }}
             th {{ background: #f0f0f0; }}
-            .obs {{ margin-top: 25px; padding: 12px; background: #f9f9f9; border: 1px solid #ddd; }}
-            .fotos {{ margin-top: 25px; }}
-            .assinatura {{ margin-top: 50px; }}
-            .linha {{ border-top: 1px solid #333; width: 280px; margin-top: 40px; }}
         </style>
     </head>
     <body>
-        <div class="header" style="display:flex; align-items:center; gap:20px;">
-            {f'<img src="/{empresa.logo}" style="height:60px; max-width:120px; object-fit:contain;">' if empresa and empresa.logo else ''}
-            <div>
-                <h1 style="margin:0;">Checklist de Entrada do Veículo</h1>
-                <div style="font-size:14px;"><strong>{empresa.nome_fantasia if empresa else 'HL Car Auto Center'}</strong></div>
-                <div style="font-size:12px; color:#555;">{empresa.telefone if empresa and empresa.telefone else ''} {(' | ' + empresa.cidade) if empresa and empresa.cidade else ''}</div>
-            </div>
+        <div class="header">
+            <h1>Checklist de Entrada do Veículo</h1>
+            <div><strong>{empresa.nome_fantasia if empresa else 'HL Car Auto Center'}</strong></div>
         </div>
-
-        <div class="info">
-            <strong>OS nº:</strong> {ordem.numero}<br>
-            <strong>Cliente:</strong> {ordem.cliente.nome if ordem.cliente else '-'}<br>
-            <strong>Veículo:</strong> {ordem.veiculo.placa if ordem.veiculo else '-'} - {ordem.veiculo.marca if ordem.veiculo else ''} {ordem.veiculo.modelo if ordem.veiculo else ''}<br>
-            <strong>Data do Checklist:</strong> {checklist.criado_em.strftime('%d/%m/%Y %H:%M') if checklist.criado_em else '-'}
-        </div>
-
+        <p><strong>OS nº:</strong> {ordem.numero}<br>
+        <strong>Cliente:</strong> {ordem.cliente.nome if ordem.cliente else '-'}<br>
+        <strong>Veículo:</strong> {ordem.veiculo.placa if ordem.veiculo else '-'}</p>
         <table>
-            <tr>
-                <th width="60%">Item</th>
-                <th>Estado</th>
-            </tr>
+            <tr><th>Item</th><th>Estado</th></tr>
     """
 
     itens = [
@@ -2961,50 +3520,17 @@ def checklist_pdf(id):
         ("Documentos", checklist.documentos),
         ("Chave Reserva", checklist.chave_reserva),
     ]
-
     for nome, valor in itens:
         html += f"<tr><td>{nome}</td><td><strong>{valor or 'OK'}</strong></td></tr>"
 
     html += f"""
         </table>
-
-        <div class="obs">
-            <strong>Observações / Avarias encontradas:</strong><br><br>
-            {checklist.observacoes or 'Nenhuma observação registrada.'}
-        </div>
-    """
-
-    if fotos_html:
-        html += f"""
-        <div class="fotos">
-            <strong>Fotos do veículo na entrada:</strong><br>
-            {fotos_html}
-        </div>
-        """
-
-    assinatura_html = ""
-    if checklist.assinatura:
-        assinatura_html = f'''
-            <div style="margin-top:30px;">
-                <strong>Assinatura do Cliente:</strong><br>
-                <img src="{checklist.assinatura}" style="max-width:300px; border:1px solid #ccc; background:#fff;">
-            </div>
-        '''
-    else:
-        assinatura_html = '''
-            <div class="assinatura">
-                <div class="linha"></div>
-                <p>Assinatura do Cliente / Responsável</p>
-            </div>
-        '''
-
-    html += f"""
-        {assinatura_html}
+        <p><strong>Observações:</strong><br>{checklist.observacoes or 'Nenhuma'}</p>
+        {fotos_html}
     </body>
     </html>
     """
 
-    # Tenta gerar PDF de verdade, se não tiver weasyprint mostra HTML para imprimir
     try:
         from weasyprint import HTML
         pdf = HTML(string=html, base_url=request.host_url).write_pdf()
@@ -3014,5 +3540,103 @@ def checklist_pdf(id):
         return response
     except Exception:
         return html
+
+
+# ============================================================
+# EMPRESAS (Multi-empresa)
+# ============================================================
+
+@app.route("/empresas")
+@login_required
+def listar_empresas():
+    # Só ADMIN pode ver
+    if session.get("usuario_perfil") != "ADMIN":
+        return redirect("/")
+
+    empresas = Empresa.query.order_by(Empresa.nome_fantasia).all()
+    return render_template("empresas.html", empresas=empresas)
+
+
+@app.route("/empresas/nova", methods=["GET", "POST"])
+@login_required
+def nova_empresa():
+    if session.get("usuario_perfil") != "ADMIN":
+        return redirect("/")
+
+    if request.method == "POST":
+        try:
+            # Cria a empresa
+            empresa = Empresa(
+                razao_social=request.form.get("razao_social"),
+                nome_fantasia=request.form.get("nome_fantasia"),
+                cnpj=request.form.get("cnpj"),
+                telefone=request.form.get("telefone"),
+                whatsapp=request.form.get("whatsapp"),
+                email=request.form.get("email"),
+                cidade=request.form.get("cidade"),
+                estado=request.form.get("estado"),
+                ativo=True
+            )
+            db.session.add(empresa)
+            db.session.flush()  # pega o ID da empresa
+
+            # Cria o primeiro usuário ADMIN da nova empresa
+            login = request.form.get("login_admin")
+            senha = request.form.get("senha_admin")
+
+            usuario = Usuario(
+                empresa_id=empresa.id,
+                nome=request.form.get("nome_admin"),
+                login=login,
+                senha=generate_password_hash(senha),
+                perfil="ADMIN",
+                ativo=True
+            )
+            db.session.add(usuario)
+            db.session.commit()
+
+            return redirect("/empresas?sucesso=1")
+        except Exception as e:
+            db.session.rollback()
+            print("Erro ao criar empresa:", e)
+            return render_template("nova_empresa.html", erro="Erro ao salvar. Verifique se o login já existe.")
+
+    return render_template("nova_empresa.html")
+@app.route("/empresas/editar/<int:id>", methods=["GET", "POST"])
+@login_required
+def editar_empresa(id):
+    if session.get("usuario_perfil") != "ADMIN":
+        return redirect("/")
+
+    empresa = Empresa.query.get_or_404(id)
+
+    if request.method == "POST":
+        try:
+            empresa.razao_social = request.form.get("razao_social")
+            empresa.nome_fantasia = request.form.get("nome_fantasia")
+            empresa.cnpj = request.form.get("cnpj")
+            empresa.telefone = request.form.get("telefone")
+            empresa.whatsapp = request.form.get("whatsapp")
+            empresa.email = request.form.get("email")
+            empresa.cidade = request.form.get("cidade")
+            empresa.estado = request.form.get("estado")
+            empresa.plano = request.form.get("plano") or "BASICO"
+            empresa.status_pagamento = request.form.get("status_pagamento") or "ATIVO"
+            empresa.ativo = True if request.form.get("ativo") == "on" else False
+            empresa.observacoes_internas = request.form.get("observacoes_internas")
+
+            data_venc = request.form.get("data_vencimento")
+            if data_venc:
+                empresa.data_vencimento = datetime.strptime(data_venc, "%Y-%m-%d").date()
+            else:
+                empresa.data_vencimento = None
+
+            db.session.commit()
+            return redirect("/empresas?sucesso=1")
+        except Exception as e:
+            db.session.rollback()
+            print("Erro ao editar empresa:", e)
+
+    return render_template("editar_empresa.html", empresa=empresa)
 if __name__ == "__main__":
     app.run(debug=True)
