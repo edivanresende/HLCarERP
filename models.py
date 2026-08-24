@@ -666,6 +666,7 @@ class Agendamento(db.Model):
     __tablename__ = "agendamentos"
 
     id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"))
     mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"), nullable=False)
     ordem_servico_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"))
 
