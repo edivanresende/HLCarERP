@@ -1844,15 +1844,15 @@ def estoque():
     except Exception:
         lista_produtos = []
     try:
-        categorias = Categoria.query.order_by(Categoria.nome).all()
+        categorias = Categoria.query.filter_by(empresa_id=eid).order_by(Categoria.nome).all()
     except Exception:
         categorias = []
     try:
-        fabricantes = Fabricante.query.order_by(Fabricante.nome).all()
+        fabricantes = Fabricante.query.filter_by(empresa_id=eid).order_by(Fabricante.nome).all()
     except Exception:
         fabricantes = []
     try:
-        fornecedores = Fornecedor.query.order_by(Fornecedor.razao_social).all()
+        fornecedores = Fornecedor.query.filter_by(empresa_id=eid).order_by(Fornecedor.razao_social).all()
     except Exception:
         fornecedores = []
     total_produtos = len(lista_produtos)
@@ -1916,21 +1916,12 @@ def novo_produto():
         except Exception as e:
             db.session.rollback()
             print("Erro produto:", e)
-            try:
-                categorias = Categoria.query.order_by(Categoria.nome).all()
-            except Exception:
-                categorias = []
-            try:
-                fabricantes = Fabricante.query.order_by(Fabricante.nome).all()
-            except Exception:
-                fabricantes = []
-            return render_template("novo_produto.html", categorias=categorias, fabricantes=fabricantes, erro=str(e))
     try:
-        categorias = Categoria.query.order_by(Categoria.nome).all()
+        categorias = Categoria.query.filter_by(empresa_id=eid).order_by(Categoria.nome).all()
     except Exception:
         categorias = []
     try:
-        fabricantes = Fabricante.query.order_by(Fabricante.nome).all()
+        fabricantes = Fabricante.query.filter_by(empresa_id=eid).order_by(Fabricante.nome).all()
     except Exception:
         fabricantes = []
     return render_template("novo_produto.html", categorias=categorias, fabricantes=fabricantes)
@@ -1966,11 +1957,11 @@ def editar_produto(id):
             db.session.rollback()
             print("Erro editar produto:", e)
     try:
-        categorias = Categoria.query.order_by(Categoria.nome).all()
+        categorias = Categoria.query.filter_by(empresa_id=eid).order_by(Categoria.nome).all()
     except Exception:
         categorias = []
     try:
-        fabricantes = Fabricante.query.order_by(Fabricante.nome).all()
+        fabricantes = Fabricante.query.filter_by(empresa_id=eid).order_by(Fabricante.nome).all()
     except Exception:
         fabricantes = []
     return render_template("editar_produto.html", produto=produto, categorias=categorias, fabricantes=fabricantes)
@@ -1993,8 +1984,11 @@ def excluir_produto(id):
 @app.route("/categorias")
 @login_required
 def categorias():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     try:
-        lista = Categoria.query.order_by(Categoria.nome).all()
+        lista = Categoria.query.filter_by(empresa_id=eid).order_by(Categoria.nome).all()
     except Exception:
         lista = []
     return render_template("categorias.html", categorias=lista)
@@ -2054,8 +2048,11 @@ def excluir_categoria(id):
 @app.route("/fabricantes")
 @login_required
 def fabricantes():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     try:
-        lista = Fabricante.query.order_by(Fabricante.nome).all()
+        lista = Fabricante.query.filter_by(empresa_id=eid).order_by(Fabricante.nome).all()
     except Exception:
         lista = []
     return render_template("fabricantes.html", fabricantes=lista)
@@ -2213,11 +2210,11 @@ def compras():
         except Exception:
             c.itens = []
     try:
-        fornecedores = Fornecedor.query.order_by(Fornecedor.razao_social).all()
+        fornecedores = Fornecedor.query.filter_by(empresa_id=eid).order_by(Fornecedor.razao_social).all()
     except Exception:
         fornecedores = []
     try:
-        produtos = Produto.query.order_by(Produto.descricao).all()
+        produtos = Produto.query.filter_by(empresa_id=eid).order_by(Produto.descricao).all()
     except Exception:
         produtos = []
     return render_template(
@@ -2895,21 +2892,23 @@ def api_offline_ordens():
 @app.route("/api/produto/codigo/<codigo>")
 @login_required
 def api_produto_por_codigo(codigo):
+    eid = empresa_atual()
+    if not eid:
+        return jsonify({"erro": "Sem empresa"}), 401
+
     codigo = (codigo or "").strip()
     if not codigo:
         return jsonify({"erro": "Código vazio"}), 400
 
-    # Procura no campo codigo
     produto = Produto.query.filter(
-        (Produto.codigo == codigo) | 
-        (Produto.codigo == codigo.lstrip("0"))
+        Produto.empresa_id == eid,
+        (Produto.codigo == codigo) | (Produto.codigo == codigo.lstrip("0"))
     ).first()
 
-    # Se não achou e existir o campo codigo_barras, procura nele também
     if not produto and hasattr(Produto, "codigo_barras"):
         produto = Produto.query.filter(
-            (Produto.codigo_barras == codigo) | 
-            (Produto.codigo_barras == codigo.lstrip("0"))
+            Produto.empresa_id == eid,
+            (Produto.codigo_barras == codigo) | (Produto.codigo_barras == codigo.lstrip("0"))
         ).first()
 
     if not produto:
@@ -2926,14 +2925,20 @@ def api_produto_por_codigo(codigo):
 @app.route("/api/produtos/buscar")
 @login_required
 def api_produtos_buscar():
+    eid = empresa_atual()
+    if not eid:
+        return jsonify([])
+
     termo = (request.args.get("q") or "").strip()
     if len(termo) < 2:
         return jsonify([])
 
     produtos = Produto.query.filter(
-        (Produto.descricao.ilike(f"%{termo}%")) |
-        (Produto.codigo.ilike(f"%{termo}%")) |
-        (Produto.codigo_barras.ilike(f"%{termo}%"))
+        Produto.empresa_id == eid,
+        (
+            Produto.descricao.ilike(f"%{termo}%") |
+            Produto.codigo.ilike(f"%{termo}%")
+        )
     ).order_by(Produto.descricao).limit(30).all()
 
     return jsonify([{
