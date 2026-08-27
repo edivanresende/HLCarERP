@@ -2812,6 +2812,7 @@ def novo_mecanico():
                 tipo=request.form.get("tipo") or "FUNCIONARIO",
                 ativo=True if request.form.get("ativo") == "on" else False,
                 forma_pagamento=request.form.get("forma_pagamento") or "comissao",
+                tipo_remuneracao=(request.form.get("tipo_remuneracao") or "COMISSAO").upper(),
                 salario=float(request.form.get("salario") or 0),
                 percentual_comissao=float(request.form.get("percentual_comissao") or 20),
                 hora_entrada=int(request.form.get("hora_entrada") or 9),
@@ -2832,6 +2833,9 @@ def novo_mecanico():
 @app.route("/mecanicos/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_mecanico(id):
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     mecanico = Mecanico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     if request.method == "POST":
         try:
@@ -2841,6 +2845,7 @@ def editar_mecanico(id):
             mecanico.tipo = request.form.get("tipo") or "FUNCIONARIO"
             mecanico.ativo = True if request.form.get("ativo") == "on" else False
             mecanico.forma_pagamento = request.form.get("forma_pagamento") or "comissao"
+            mecanico.tipo_remuneracao = (request.form.get("tipo_remuneracao") or "COMISSAO").upper()
             mecanico.salario = float(request.form.get("salario") or 0)
             mecanico.percentual_comissao = float(request.form.get("percentual_comissao") or 20)
             mecanico.hora_entrada = int(request.form.get("hora_entrada") or 9)

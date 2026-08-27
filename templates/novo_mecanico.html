@@ -38,12 +38,12 @@
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label text-secondary">Forma de pagamento</label>
-                    <select name="forma_pagamento" class="form-select bg-dark text-white border-secondary">
-                        <option value="comissao" {% if mecanico and mecanico.forma_pagamento == 'comissao' %}selected{% endif %}>Só comissão</option>
-                        <option value="salario" {% if mecanico and mecanico.forma_pagamento == 'salario' %}selected{% endif %}>Só salário</option>
-                        <option value="salario_comissao" {% if mecanico and mecanico.forma_pagamento == 'salario_comissao' %}selected{% endif %}>Salário + Comissão</option>
-                    </select>
+                    <select name="tipo_remuneracao" class="form-select bg-dark text-white border-secondary">
+    <option value="COMISSAO" {% if mecanico and mecanico.tipo_remuneracao == 'COMISSAO' %}selected{% endif %}>Só comissão</option>
+    <option value="SALARIO" {% if mecanico and mecanico.tipo_remuneracao == 'SALARIO' %}selected{% endif %}>Só salário</option>
+    <option value="MISTO" {% if mecanico and mecanico.tipo_remuneracao == 'MISTO' %}selected{% endif %}>Salário + comissão</option>
+    <option value="PARCEIRO" {% if mecanico and mecanico.tipo_remuneracao == 'PARCEIRO' %}selected{% endif %}>Parceiro (negociado)</option>
+</select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label text-secondary">Salário (R$)</label>
