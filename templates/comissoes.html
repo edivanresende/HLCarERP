@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Comissões / Pagamentos{% endblock %}
+{% block conteudo %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+      <h2 class="text-white mb-1">Comissões e pagamentos</h2>
+      <p class="text-secondary mb-0">
+        Base líquida = serviço − imposto ({{ aliquota_padrao }}% padrão).
+        Corte: dia {{ dia_corte }}
+      </p>
+    </div>
+    <form class="d-flex align-items-end gap-2 flex-wrap" method="get">
+      <div>
+        <label class="form-label text-secondary small mb-1">De</label>
+        <input type="date" name="data_ini" value="{{ data_ini }}" class="form-control bg-dark text-white border-secondary">
+      </div>
+      <div>
+        <label class="form-label text-secondary small mb-1">Até</label>
+        <input type="date" name="data_fim" value="{{ data_fim }}" class="form-control bg-dark text-white border-secondary">
+      </div>
+      <button class="btn btn-warning fw-bold">Filtrar</button>
+      <a href="/comissoes" class="btn btn-outline-secondary">Período do corte</a>
+    </form>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="card bg-dark border-warning h-100"><div class="card-body">
+      <div class="text-secondary small">Total a pagar</div>
+      <div class="fs-3 fw-bold text-warning">R$ {{ "%.2f"|format(total_geral) }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card bg-dark border-info h-100"><div class="card-body">
+      <div class="text-secondary small">Comissões</div>
+      <div class="fs-4 fw-bold text-info">R$ {{ "%.2f"|format(total_comissao) }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card bg-dark border-success h-100"><div class="card-body">
+      <div class="text-secondary small">Salários</div>
+      <div class="fs-4 fw-bold text-success">R$ {{ "%.2f"|format(total_salario) }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card bg-dark border-secondary h-100"><div class="card-body">
+      <div class="text-secondary small">Imposto na base</div>
+      <div class="fs-4 fw-bold">R$ {{ "%.2f"|format(total_imposto) }}</div>
+    </div></div></div>
+  </div>
+
+  <div class="card bg-dark border-secondary">
+    <div class="card-body table-responsive">
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Mecânico</th><th>Tipo</th><th>Serviços</th>
+            <th>Base bruta</th><th>Imposto</th><th>Base líquida</th>
+            <th>Comissão</th><th>Salário</th><th>Total a pagar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in resumo %}
+          <tr>
+            <td class="fw-bold">{{ r.mecanico.nome }}</td>
+            <td><span class="badge bg-secondary">{{ r.tipo_remuneracao }}</span></td>
+            <td>{{ r.qtd_servicos }}</td>
+            <td>R$ {{ "%.2f"|format(r.base_bruta) }}</td>
+            <td class="text-danger">R$ {{ "%.2f"|format(r.imposto) }}</td>
+            <td>R$ {{ "%.2f"|format(r.base_liquida) }}</td>
+            <td class="text-info">R$ {{ "%.2f"|format(r.comissao) }}</td>
+            <td>R$ {{ "%.2f"|format(r.salario_periodo) }}</td>
+            <td class="fw-bold text-warning">R$ {{ "%.2f"|format(r.total_pagar) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-secondary">Nenhum serviço no período.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
