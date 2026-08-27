@@ -53,6 +53,124 @@ app.config.from_object(Config)
 app.secret_key = "hlcar-erp-secret-key-2026-change-me"
 
 db.init_app(app)
+# ============================================================
+# COMISSÕES / PAGAMENTO MECÂNICOS
+# ============================================================
+
+def periodo_corte_comissao(empresa, ref_date=None):
+    """Retorna (data_inicio, data_fim) do período de corte atual."""
+    if ref_date is None:
+        ref_date = date.today()
+    dia = int(getattr(empresa, "dia_corte_comissao", None) or 15)
+    dia = max(1, min(28, dia))
+
+    if ref_date.day >= dia:
+        ini = date(ref_date.year, ref_date.month, dia)
+        if ref_date.month == 12:
+            fim = date(ref_date.year + 1, 1, dia) - timedelta(days=1)
+        else:
+            fim = date(ref_date.year, ref_date.month + 1, dia) - timedelta(days=1)
+    else:
+        if ref_date.month == 1:
+            ini = date(ref_date.year - 1, 12, dia)
+        else:
+            ini = date(ref_date.year, ref_date.month - 1, dia)
+        fim = date(ref_date.year, ref_date.month, dia) - timedelta(days=1)
+    return ini, fim
+
+
+def calc_comissao_linha(valor_negociado, percentual, aliquota_imposto, tipo_remuneracao="COMISSAO"):
+    base = float(valor_negociado or 0)
+    pct = float(percentual or 0)
+    aliq = float(aliquota_imposto if aliquota_imposto is not None else 10.0)
+    tipo = (tipo_remuneracao or "COMISSAO").upper()
+
+    if tipo == "PARCEIRO":
+        return {"base_bruta": base, "imposto": 0.0, "base_liquida": base, "valor_comissao": base}
+    if tipo == "SALARIO":
+        return {
+            "base_bruta": base,
+            "imposto": round(base * aliq / 100.0, 2),
+            "base_liquida": round(base * (1 - aliq / 100.0), 2),
+            "valor_comissao": 0.0,
+        }
+
+    imposto = round(base * aliq / 100.0, 2)
+    liquida = round(base - imposto, 2)
+    comissao = round(liquida * pct / 100.0, 2)
+    return {"base_bruta": base, "imposto": imposto, "base_liquida": liquida, "valor_comissao": comissao}
+
+
+def resumo_comissoes_periodo(eid, data_ini, data_fim):
+    empresa = Empresa.query.get(eid)
+    aliq_padrao = float(getattr(empresa, "aliquota_imposto_comissao", None) or 10.0)
+
+    vinculos = (
+        db.session.query(OrdemServicoMecanico, OrdemServico, Mecanico)
+        .join(OrdemServico, OrdemServicoMecanico.ordem_servico_id == OrdemServico.id)
+        .join(Mecanico, OrdemServicoMecanico.mecanico_id == Mecanico.id)
+        .filter(
+            OrdemServico.empresa_id == eid,
+            OrdemServico.data_abertura >= datetime.combine(data_ini, datetime.min.time()),
+            OrdemServico.data_abertura < datetime.combine(data_fim + timedelta(days=1), datetime.min.time()),
+        )
+        .all()
+    )
+
+    por_mec = {}
+    for osm, ordem, mec in vinculos:
+        mid = mec.id
+        if mid not in por_mec:
+            tipo_rem = (getattr(mec, "tipo_remuneracao", None) or "COMISSAO").upper()
+            if (mec.tipo or "").upper() == "PARCEIRO":
+                tipo_rem = "PARCEIRO"
+            por_mec[mid] = {
+                "mecanico": mec,
+                "tipo_remuneracao": tipo_rem,
+                "salario": float(mec.salario or 0),
+                "percentual_padrao": float(mec.percentual_comissao or 0),
+                "qtd_servicos": 0,
+                "base_bruta": 0.0,
+                "imposto": 0.0,
+                "base_liquida": 0.0,
+                "comissao": 0.0,
+                "linhas": [],
+            }
+
+        aliq = getattr(osm, "aliquota_imposto", None)
+        if aliq is None:
+            aliq = aliq_padrao
+        pct = osm.percentual_comissao if osm.percentual_comissao is not None else mec.percentual_comissao
+        tipo_rem = por_mec[mid]["tipo_remuneracao"]
+        calc = calc_comissao_linha(osm.valor_negociado, pct, aliq, tipo_rem)
+
+        osm.base_comissao = calc["base_liquida"]
+        osm.valor_comissao = calc["valor_comissao"]
+
+        por_mec[mid]["qtd_servicos"] += 1
+        por_mec[mid]["base_bruta"] += calc["base_bruta"]
+        por_mec[mid]["imposto"] += calc["imposto"]
+        por_mec[mid]["base_liquida"] += calc["base_liquida"]
+        por_mec[mid]["comissao"] += calc["valor_comissao"]
+        por_mec[mid]["linhas"].append({
+            "os_id": ordem.id,
+            "os_numero": getattr(ordem, "numero", ordem.id),
+            "descricao": osm.descricao_servico,
+            **calc,
+        })
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    lista = []
+    for mid, d in por_mec.items():
+        salario = d["salario"] if d["tipo_remuneracao"] in ("SALARIO", "MISTO") else 0.0
+        total = round(salario + d["comissao"], 2)
+        lista.append({**d, "salario_periodo": salario, "total_pagar": total})
+    lista.sort(key=lambda x: x["total_pagar"], reverse=True)
+    return lista
 
 
 # ============================================================
@@ -66,6 +184,44 @@ def login_required(f):
             return redirect("/login")
         return f(*args, **kwargs)
     return decorated_function
+@app.route("/comissoes")
+@login_required
+def comissoes():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+ 
+    empresa = Empresa.query.get(eid)
+    data_ini_s = request.args.get("data_ini")
+    data_fim_s = request.args.get("data_fim")
+ 
+    if data_ini_s and data_fim_s:
+        try:
+            data_ini = datetime.strptime(data_ini_s, "%Y-%m-%d").date()
+            data_fim = datetime.strptime(data_fim_s, "%Y-%m-%d").date()
+        except Exception:
+            data_ini, data_fim = periodo_corte_comissao(empresa)
+    else:
+        data_ini, data_fim = periodo_corte_comissao(empresa)
+ 
+    resumo = resumo_comissoes_periodo(eid, data_ini, data_fim)
+    total_geral = sum(r["total_pagar"] for r in resumo)
+    total_comissao = sum(r["comissao"] for r in resumo)
+    total_salario = sum(r["salario_periodo"] for r in resumo)
+    total_imposto = sum(r["imposto"] for r in resumo)
+ 
+    return render_template(
+        "comissoes.html",
+        resumo=resumo,
+        data_ini=data_ini.isoformat(),
+        data_fim=data_fim.isoformat(),
+        dia_corte=getattr(empresa, "dia_corte_comissao", 15) or 15,
+        aliquota_padrao=getattr(empresa, "aliquota_imposto_comissao", 10) or 10,
+        total_geral=total_geral,
+        total_comissao=total_comissao,
+        total_salario=total_salario,
+        total_imposto=total_imposto,
+    )
 
 
 def empresa_atual():
@@ -1208,6 +1364,9 @@ def ordens():
 @app.route("/abrir-os-placa", methods=["GET", "POST"])
 @login_required
 def ordens_por_placa():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
     placa = None
 
     if request.args.get("placa"):
