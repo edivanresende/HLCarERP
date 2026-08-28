@@ -25,6 +25,9 @@ class Empresa(db.Model):
     status_pagamento = db.Column(db.String(20), default="ATIVO")  # ATIVO | BLOQUEADO | INATIVO
     plano = db.Column(db.String(50), default="BASICO")
     observacoes_internas = db.Column(db.Text)
+        # Comissão / pagamento mecânicos
+    dia_corte_comissao = db.Column(db.Integer, default=15)          # 1 a 28
+    aliquota_imposto_comissao = db.Column(db.Float, default=10.0)  # % padrão
 
     url_nfse = db.Column(db.String(255))
     # Campos para NFS-e Automática
@@ -459,6 +462,7 @@ class OrdemServico(db.Model):
     consultor = db.Column(db.String(120))
     mecanico = db.Column(db.String(120))
     mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"))
+    mecanico = db.relationship("Mecanico")
     os_origem_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"))
     is_retrabalho = db.Column(db.Boolean, default=False)
     defeito_relatado = db.Column(db.Text)
@@ -624,6 +628,9 @@ class Mecanico(db.Model):
     forma_pagamento = db.Column(db.String(30), default="comissao")
     salario = db.Column(db.Float, default=0)
     percentual_comissao = db.Column(db.Float, default=20)
+        # Remuneração: SALARIO | COMISSAO | MISTO | PARCEIRO
+    # (mantém "tipo" antigo FUNCIONARIO/PARCEIRO por compatibilidade)
+    tipo_remuneracao = db.Column(db.String(20), default="COMISSAO")
 
     hora_entrada = db.Column(db.Integer, default=9)
     hora_saida = db.Column(db.Integer, default=18)
@@ -631,6 +638,23 @@ class Mecanico(db.Model):
     almoco_fim = db.Column(db.Integer, default=14)
 
     observacoes = db.Column(db.Text)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+
+class PagamentoComissao(db.Model):
+    __tablename__ = "pagamentos_comissao"
+
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"))
+    mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"), nullable=False)
+    mecanico = db.relationship("Mecanico")
+    periodo_ini = db.Column(db.Date, nullable=False)
+    periodo_fim = db.Column(db.Date, nullable=False)
+    valor_pago = db.Column(db.Float, default=0)
+    data_pagamento = db.Column(db.DateTime, default=datetime.utcnow)
+    forma_pagamento = db.Column(db.String(30))
+    observacoes = db.Column(db.Text)
+    usuario_id = db.Column(db.Integer)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -651,6 +675,8 @@ class OrdemServicoMecanico(db.Model):
     valor_mercado = db.Column(db.Float, default=0)
     valor_negociado = db.Column(db.Float, default=0)
     percentual_comissao = db.Column(db.Float, default=20)
+    # Imposto sobre a base (padrão 10; pode mudar por serviço)
+    aliquota_imposto = db.Column(db.Float, default=10.0)
     base_comissao = db.Column(db.Float, default=0)
     valor_comissao = db.Column(db.Float, default=0)
 

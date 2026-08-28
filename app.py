@@ -43,6 +43,7 @@ from models import (
     ContaReceber,
     ContaPagar,
     Caixa,
+    PagamentoComissao,
 )
 
 from pdf_ordem_old import gerar_pdf_ordem
@@ -126,6 +127,8 @@ def resumo_comissoes_periodo(eid, data_ini, data_fim):
                 tipo_rem = "PARCEIRO"
             por_mec[mid] = {
                 "mecanico": mec,
+                "mecanico_id": mid,
+                "nome": mec.nome,
                 "tipo_remuneracao": tipo_rem,
                 "salario": float(mec.salario or 0),
                 "percentual_padrao": float(mec.percentual_comissao or 0),
@@ -209,6 +212,34 @@ def comissoes():
     total_comissao = sum(r["comissao"] for r in resumo)
     total_salario = sum(r["salario_periodo"] for r in resumo)
     total_imposto = sum(r["imposto"] for r in resumo)
+    pagos = {}
+    historico = []
+    try:
+        hist = PagamentoComissao.query.filter(
+            PagamentoComissao.empresa_id == eid,
+            PagamentoComissao.periodo_ini == data_ini,
+            PagamentoComissao.periodo_fim == data_fim,
+        ).order_by(PagamentoComissao.data_pagamento.desc()).all()
+        historico = hist
+        for p in hist:
+            pagos[p.mecanico_id] = pagos.get(p.mecanico_id, 0) + float(p.valor_pago or 0)
+    except Exception as e:
+        print("Erro pagamentos comissao:", e)
+
+    for r in resumo:
+        mid = r.get("mecanico_id") or getattr(r.get("mecanico"), "id", None)
+        ja_pago = round(pagos.get(mid, 0), 2)
+        r["mecanico_id"] = mid
+        r["ja_pago"] = ja_pago
+        r["saldo"] = round(float(r["total_pagar"]) - ja_pago, 2)
+        if r["saldo"] <= 0.009:
+            r["situacao"] = "PAGO"
+        elif ja_pago > 0:
+            r["situacao"] = "PARCIAL"
+        else:
+            r["situacao"] = "PENDENTE"
+    total_pago = sum(r.get("ja_pago", 0) for r in resumo)
+    total_saldo = sum(r.get("saldo", 0) for r in resumo)
  
     return render_template(
         "comissoes.html",
@@ -221,7 +252,42 @@ def comissoes():
         total_comissao=total_comissao,
         total_salario=total_salario,
         total_imposto=total_imposto,
+        historico=historico,
+        total_pago=total_pago,
+        total_saldo=total_saldo,
     )
+    
+
+@app.route("/comissoes/pagar", methods=["POST"])
+@login_required
+def comissoes_pagar():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    try:
+        mid = int(request.form.get("mecanico_id") or 0)
+        valor = float(str(request.form.get("valor_pago") or "0").replace(",", "."))
+        forma = request.form.get("forma_pagamento") or "PIX"
+        obs = request.form.get("observacoes") or ""
+        data_ini = datetime.strptime(request.form.get("data_ini"), "%Y-%m-%d").date()
+        data_fim = datetime.strptime(request.form.get("data_fim"), "%Y-%m-%d").date()
+        if mid and valor > 0:
+            pag = PagamentoComissao(
+                empresa_id=eid,
+                mecanico_id=mid,
+                periodo_ini=data_ini,
+                periodo_fim=data_fim,
+                valor_pago=valor,
+                forma_pagamento=forma,
+                observacoes=obs,
+                usuario_id=session.get("usuario_id"),
+            )
+            db.session.add(pag)
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print("Erro ao registrar pagamento:", e)
+    return redirect(f"/comissoes?data_ini={request.form.get('data_ini')}&data_fim={request.form.get('data_fim')}")
 
 
 def empresa_atual():
@@ -396,7 +462,6 @@ def corrigir_colunas_banco():
             result = db.session.execute(text("PRAGMA table_info(checklist_veiculo)")).fetchall()
             colunas = [row[1] for row in result]
             if "assinatura" not in colunas:
-                db.session.execute(text("ALTER TABLE checklist_veiculo ADD COLUMN assinatura TEXT"))
                 print("✅ checklist_veiculo.assinatura adicionada")
         except Exception as e:
             print("Erro checklist_veiculo:", e)
