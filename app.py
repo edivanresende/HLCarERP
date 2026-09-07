@@ -2705,55 +2705,168 @@ def movimentacoes():
 @app.route("/financeiro")
 @login_required
 def financeiro():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
     periodo = request.args.get("periodo")
     data_inicio = request.args.get("data_inicio")
     data_fim = request.args.get("data_fim")
-
-    query = OrdemServico.query
     hoje = date.today()
 
+    ini = fim = None
     if periodo == "hoje":
-        query = query.filter(func.date(OrdemServico.data_abertura) == hoje)
+        ini = fim = hoje
     elif periodo == "semana":
-        inicio_semana = hoje - timedelta(days=hoje.weekday())
-        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_semana)
+        ini = hoje - timedelta(days=hoje.weekday())
+        fim = hoje
     elif periodo == "mes":
-        inicio_mes = hoje.replace(day=1)
-        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_mes)
+        ini = hoje.replace(day=1)
+        fim = hoje
     elif periodo == "ano":
-        inicio_ano = hoje.replace(month=1, day=1)
-        query = query.filter(func.date(OrdemServico.data_abertura) >= inicio_ano)
-    elif data_inicio:
+        ini = date(hoje.year, 1, 1)
+        fim = hoje
+    else:
         try:
-            di = datetime.strptime(data_inicio, "%Y-%m-%d").date()
-            query = query.filter(func.date(OrdemServico.data_abertura) >= di)
+            if data_inicio:
+                ini = datetime.strptime(data_inicio, "%Y-%m-%d").date()
             if data_fim:
-                df = datetime.strptime(data_fim, "%Y-%m-%d").date()
-                query = query.filter(func.date(OrdemServico.data_abertura) <= df)
-        except:
-            pass
+                fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+        except Exception:
+            ini = fim = None
 
-    try:
-        total_ordens = query.count()
-        faturamento = query.with_entities(func.coalesce(func.sum(OrdemServico.valor_total), 0)).scalar() or 0
-        abertas = query.filter(OrdemServico.status == "ABERTA").count()
-        finalizadas = query.filter(OrdemServico.status == "FINALIZADA").count()
-    except Exception:
-        total_ordens = 0
-        faturamento = 0
-        abertas = 0
-        finalizadas = 0
+    q = OrdemServico.query.filter_by(empresa_id=eid)
+    if ini:
+        q = q.filter(OrdemServico.data_abertura >= datetime.combine(ini, datetime.min.time()))
+    if fim:
+        q = q.filter(OrdemServico.data_abertura < datetime.combine(fim + timedelta(days=1), datetime.min.time()))
+    ordens = q.all()
+    total_ordens = len(ordens)
+    faturamento = sum(float(o.valor_total or 0) for o in ordens)
+    abertas = sum(1 for o in ordens if (o.status or "").upper() == "ABERTA")
+    finalizadas = sum(1 for o in ordens if (o.status or "").upper() == "FINALIZADA")
+
+    def _dt(x):
+        if not x:
+            return None
+        return x.date() if hasattr(x, "date") else x
+
+    contas_rec = ContaReceber.query.filter_by(empresa_id=eid).order_by(ContaReceber.data_vencimento.desc()).all()
+    contas_pag = ContaPagar.query.filter_by(empresa_id=eid).order_by(ContaPagar.data_vencimento.desc()).all()
+    movs = Caixa.query.filter_by(empresa_id=eid).order_by(Caixa.data_movimento.desc()).limit(80).all()
+
+    def _aberto(c):
+        v = float(getattr(c, "valor", 0) or 0)
+        p = float(getattr(c, "valor_pago", 0) or 0)
+        if getattr(c, "data_pagamento", None) and p <= 0:
+            p = v
+        return round(max(v - p, 0), 2)
+
+    rec_aberto = sum(_aberto(c) for c in contas_rec)
+    pag_aberto = sum(_aberto(c) for c in contas_pag)
+    rec_venc = sum(_aberto(c) for c in contas_rec if _dt(c.data_vencimento) and _dt(c.data_vencimento) < hoje and _aberto(c) > 0)
+    pag_venc = sum(_aberto(c) for c in contas_pag if _dt(c.data_vencimento) and _dt(c.data_vencimento) < hoje and _aberto(c) > 0)
+
+    entradas = saidas = 0.0
+    for m in Caixa.query.filter_by(empresa_id=eid).all():
+        d = _dt(m.data_movimento)
+        if ini and d and d < ini:
+            continue
+        if fim and d and d > fim:
+            continue
+        v = float(m.valor or 0)
+        if (m.tipo or "").upper() in ("E", "ENTRADA", "C", "CREDITO"):
+            entradas += v
+        else:
+            saidas += v
 
     return render_template(
         "financeiro.html",
+        periodo=periodo,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
         total_ordens=total_ordens,
         faturamento=faturamento,
         abertas=abertas,
         finalizadas=finalizadas,
-        periodo=periodo,
-        data_inicio=data_inicio,
-        data_fim=data_fim
+        contas_rec=contas_rec,
+        contas_pag=contas_pag,
+        movs=movs,
+        rec_aberto=rec_aberto,
+        pag_aberto=pag_aberto,
+        rec_venc=rec_venc,
+        pag_venc=pag_venc,
+        entradas=entradas,
+        saidas=saidas,
+        saldo_caixa=round(entradas - saidas, 2),
     )
+
+    @app.route("/financeiro/caixa", methods=["POST"])
+@login_required
+def financeiro_caixa():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    raw = (request.form.get("valor") or "0").replace(",", ".")
+    try:
+        valor = float(raw)
+    except Exception:
+        valor = 0
+    tipo = (request.form.get("tipo") or "ENTRADA").upper()
+    if valor > 0:
+        db.session.add(Caixa(
+            empresa_id=eid,
+            tipo="ENTRADA" if tipo.startswith("E") else "SAIDA",
+            origem=request.form.get("origem") or "MANUAL",
+            documento=request.form.get("documento") or "",
+            descricao=request.form.get("descricao") or "Lançamento manual",
+            valor=valor,
+            data_movimento=datetime.now(),
+        ))
+        db.session.commit()
+    return redirect("/financeiro")
+
+
+@app.route("/financeiro/receber/<int:id>/quitar", methods=["POST"])
+@login_required
+def financeiro_quitar_receber(id):
+    eid = empresa_atual()
+    c = ContaReceber.query.filter_by(id=id, empresa_id=eid).first()
+    if c:
+        valor = float(getattr(c, "valor", 0) or 0)
+        if hasattr(c, "valor_pago"):
+            c.valor_pago = valor
+        if hasattr(c, "status"):
+            c.status = "PAGO"
+        c.data_pagamento = datetime.now()
+        db.session.add(Caixa(
+            empresa_id=eid, tipo="ENTRADA", origem="CONTA_RECEBER",
+            documento=str(c.id), descricao=c.descricao or "Recebimento",
+            valor=valor, data_movimento=datetime.now(),
+        ))
+        db.session.commit()
+    return redirect("/financeiro")
+
+
+@app.route("/financeiro/pagar/<int:id>/quitar", methods=["POST"])
+@login_required
+def financeiro_quitar_pagar(id):
+    eid = empresa_atual()
+    c = ContaPagar.query.filter_by(id=id, empresa_id=eid).first()
+    if c:
+        valor = float(getattr(c, "valor", 0) or 0)
+        if hasattr(c, "valor_pago"):
+            c.valor_pago = valor
+        if hasattr(c, "status"):
+            c.status = "PAGO"
+        c.data_pagamento = datetime.now()
+        db.session.add(Caixa(
+            empresa_id=eid, tipo="SAIDA", origem="CONTA_PAGAR",
+            documento=str(c.id), descricao=c.descricao or "Pagamento",
+            valor=valor, data_movimento=datetime.now(),
+        ))
+        db.session.commit()
+    return redirect("/financeiro")
 
 
 # ============================================================
