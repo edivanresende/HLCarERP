@@ -1,6 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import UniqueConstraint, Index, Numeric
-from datetime import datetime
+from datetime import datetime, date
 
 db = SQLAlchemy()
 
@@ -639,23 +639,6 @@ class Mecanico(db.Model):
 
     observacoes = db.Column(db.Text)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
-    
-
-class PagamentoComissao(db.Model):
-    __tablename__ = "pagamentos_comissao"
-
-    id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"))
-    mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"), nullable=False)
-    mecanico = db.relationship("Mecanico")
-    periodo_ini = db.Column(db.Date, nullable=False)
-    periodo_fim = db.Column(db.Date, nullable=False)
-    valor_pago = db.Column(db.Float, default=0)
-    data_pagamento = db.Column(db.DateTime, default=datetime.utcnow)
-    forma_pagamento = db.Column(db.String(30))
-    observacoes = db.Column(db.Text)
-    usuario_id = db.Column(db.Integer)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # ==========================================================
@@ -810,3 +793,27 @@ class ChecklistVeiculo(db.Model):
     alterado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     ordem_servico = db.relationship("OrdemServico", backref="checklist")
+
+
+class PagamentoComissao(db.Model):
+    __tablename__ = "pagamentos_comissao"
+
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"), nullable=False)
+    mecanico_id = db.Column(db.Integer, db.ForeignKey("mecanicos.id"), nullable=False)
+
+    periodo_ini = db.Column(db.DateTime, nullable=False)
+    periodo_fim = db.Column(db.DateTime, nullable=False)
+    valor_pago = db.Column(db.Float, default=0)
+
+    data_inicio = db.Column(db.DateTime)
+    data_fim = db.Column(db.DateTime)
+    valor = db.Column(db.Float, default=0)
+
+    data_pagamento = db.Column(db.DateTime, default=datetime.utcnow)
+    forma_pagamento = db.Column(db.String(30), default="PIX")
+    observacoes = db.Column(db.Text)
+    usuario_id = db.Column(db.Integer)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    mecanico = db.relationship("Mecanico", backref="pagamentos_comissao")

@@ -222,7 +222,7 @@ def comissoes():
         ).order_by(PagamentoComissao.data_pagamento.desc()).all()
         historico = hist
         for p in hist:
-            pagos[p.mecanico_id] = pagos.get(p.mecanico_id, 0) + float(p.valor_pago or 0)
+            pagos[p.mecanico_id] = pagos.get(p.mecanico_id, 0) + float(p.valor or 0)
     except Exception as e:
         print("Erro pagamentos comissao:", e)
 
@@ -241,6 +241,42 @@ def comissoes():
     total_pago = sum(r.get("ja_pago", 0) for r in resumo)
     total_saldo = sum(r.get("saldo", 0) for r in resumo)
  
+    historico = (
+        PagamentoComissao.query.filter_by(empresa_id=eid)
+        .order_by(PagamentoComissao.id.desc())
+        .all()
+    )
+
+    pagos_por_mec = {}
+    total_pago = 0.0
+    for p in historico:
+        v = float(p.valor or getattr(p, "valor_pago", None) or 0)
+        midp = int(p.mecanico_id)
+        pagos_por_mec[midp] = pagos_por_mec.get(midp, 0.0) + v
+        total_pago += v
+
+    for item in resumo:
+        try:
+            mid = int(item.get("mecanico_id") or item.get("id") or 0)
+        except Exception:
+            mid = 0
+        pago = round(pagos_por_mec.get(mid, 0.0), 2)
+        total = float(item.get("total_pagar") or 0)
+        saldo = round(total - pago, 2)
+        item["pago"] = pago
+        item["ja_pago"] = pago
+        item["saldo"] = saldo
+        if saldo <= 0.009:
+            item["situacao"] = "PAGO"
+        elif pago > 0:
+            item["situacao"] = "PARCIAL"
+        else:
+            item["situacao"] = "PENDENTE"
+
+    total_pago = round(total_pago, 2)
+    total_saldo = round(float(total_geral or 0) - total_pago, 2)
+
+
     return render_template(
         "comissoes.html",
         resumo=resumo,
@@ -264,32 +300,83 @@ def comissoes_pagar():
     eid = empresa_atual()
     if not eid:
         return redirect("/login")
+
+    mid = request.form.get("mecanico_id", type=int)
+    raw = (request.form.get("valor") or "0").strip().replace(",", ".")
     try:
-        mid = int(request.form.get("mecanico_id") or 0)
-        valor = float(str(request.form.get("valor_pago") or "0").replace(",", "."))
-        forma = request.form.get("forma_pagamento") or "PIX"
-        obs = request.form.get("observacoes") or ""
-        data_ini = datetime.strptime(request.form.get("data_ini"), "%Y-%m-%d").date()
-        data_fim = datetime.strptime(request.form.get("data_fim"), "%Y-%m-%d").date()
-        if mid and valor > 0:
-            pag = PagamentoComissao(
-                empresa_id=eid,
-                mecanico_id=mid,
-                periodo_ini=data_ini,
-                periodo_fim=data_fim,
-                valor_pago=valor,
-                forma_pagamento=forma,
-                observacoes=obs,
-                usuario_id=session.get("usuario_id"),
-            )
-            db.session.add(pag)
-            db.session.commit()
+        valor = float(raw)
+    except Exception:
+        valor = 0
+    forma = (request.form.get("forma_pagamento") or "PIX").upper()
+    obs = request.form.get("observacoes") or ""
+    data_ini = request.form.get("data_ini")
+    data_fim = request.form.get("data_fim")
+    data_pag = request.form.get("data_pagamento")
+
+    if not mid or valor <= 0 or not data_ini or not data_fim:
+        return redirect("/comissoes")
+
+    try:
+        d_ini = datetime.strptime(str(data_ini)[:10], "%Y-%m-%d")
+        d_fim = datetime.strptime(str(data_fim)[:10], "%Y-%m-%d")
+        if data_pag:
+            d_pag = datetime.strptime(str(data_pag)[:10], "%Y-%m-%d")
+        else:
+            d_pag = datetime.now()
     except Exception as e:
-        db.session.rollback()
-        print("Erro ao registrar pagamento:", e)
-    return redirect(f"/comissoes?data_ini={request.form.get('data_ini')}&data_fim={request.form.get('data_fim')}")
+        print("Erro data pagamento:", e)
+        return redirect("/comissoes")
 
+    mec = Mecanico.query.filter_by(id=mid, empresa_id=eid).first()
+    if not mec:
+        return redirect("/comissoes")
 
+    pag = PagamentoComissao(
+        empresa_id=eid,
+        mecanico_id=mid,
+        periodo_ini=d_ini,
+        periodo_fim=d_fim,
+        valor_pago=valor,
+        data_inicio=d_ini,
+        data_fim=d_fim,
+        valor=valor,
+        data_pagamento=d_pag,
+        forma_pagamento=forma,
+        observacoes=obs,
+        usuario_id=session.get("usuario_id"),
+    )
+    db.session.add(pag)
+    db.session.commit()
+    return redirect(f"/comissoes?data_ini={data_ini}&data_fim={data_fim}")
+
+@app.route("/comissoes/pagamento/<int:pid>/excluir", methods=["POST"])
+@login_required
+def comissoes_pagamento_excluir(pid):
+    eid = empresa_atual()
+    p = PagamentoComissao.query.filter_by(id=pid, empresa_id=eid).first()
+    if p:
+        db.session.delete(p)
+        db.session.commit()
+    di = request.form.get("data_ini") or ""
+    df = request.form.get("data_fim") or ""
+    return redirect(f"/comissoes?data_ini={di}&data_fim={df}")
+@app.route("/comissoes/pagamentos/excluir", methods=["POST"])
+@login_required
+def comissoes_pagamentos_excluir_varios():
+    eid = empresa_atual()
+    ids = request.form.getlist("ids")
+    for i in ids:
+        try:
+            pid = int(i)
+        except Exception:
+            continue
+        p = PagamentoComissao.query.filter_by(id=pid, empresa_id=eid).first()
+        if p:
+            db.session.delete(p)
+    db.session.commit()
+    di = request.form.get("data_ini") or ""
+    df = request.form.get("data_fim") or ""
+    return redirect(f"/comissoes?data_ini={di}&data_fim={df}")
 def empresa_atual():
     """Retorna o empresa_id da sessão. Se não tiver, força logout."""
     eid = session.get("empresa_id")
