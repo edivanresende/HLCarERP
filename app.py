@@ -83,11 +83,9 @@ def periodo_corte_comissao(empresa, ref_date=None):
 def calc_comissao_linha(valor_negociado, percentual, aliquota_imposto, tipo_remuneracao="COMISSAO"):
     base = float(valor_negociado or 0)
     pct = float(percentual or 0)
-    aliq = float(aliquota_imposto if aliquota_imposto is not None else 10.0)
+    aliq = float(aliquota_imposto if aliquota_imposto is not None else 6.0)
     tipo = (tipo_remuneracao or "COMISSAO").upper()
 
-    if tipo == "PARCEIRO":
-        return {"base_bruta": base, "imposto": 0.0, "base_liquida": base, "valor_comissao": base}
     if tipo == "SALARIO":
         return {
             "base_bruta": base,
@@ -96,15 +94,15 @@ def calc_comissao_linha(valor_negociado, percentual, aliquota_imposto, tipo_remu
             "valor_comissao": 0.0,
         }
 
-    imposto = round(base * aliq / 100.0, 2)
-    liquida = round(base - imposto, 2)
-    comissao = round(liquida * pct / 100.0, 2)
-    return {"base_bruta": base, "imposto": imposto, "base_liquida": liquida, "valor_comissao": comissao}
+    comissao_bruta = round(base * pct / 100.0, 2)
+    imposto = round(comissao_bruta * aliq / 100.0, 2)
+    comissao = round(comissao_bruta - imposto, 2)
+    return {"base_bruta": base, "imposto": imposto, "base_liquida": comissao_bruta, "valor_comissao": comissao}
 
 
 def resumo_comissoes_periodo(eid, data_ini, data_fim):
     empresa = Empresa.query.get(eid)
-    aliq_padrao = float(getattr(empresa, "aliquota_imposto_comissao", None) or 10.0)
+    aliq_padrao = float(getattr(empresa, "aliquota_imposto_comissao", None) or 6.0)
 
     vinculos = (
         db.session.query(OrdemServicoMecanico, OrdemServico, Mecanico)
@@ -112,6 +110,7 @@ def resumo_comissoes_periodo(eid, data_ini, data_fim):
         .join(Mecanico, OrdemServicoMecanico.mecanico_id == Mecanico.id)
         .filter(
             OrdemServico.empresa_id == eid,
+            OrdemServico.status == "FINALIZADA",
             OrdemServico.data_abertura >= datetime.combine(data_ini, datetime.min.time()),
             OrdemServico.data_abertura < datetime.combine(data_fim + timedelta(days=1), datetime.min.time()),
         )
@@ -140,8 +139,6 @@ def resumo_comissoes_periodo(eid, data_ini, data_fim):
                 "linhas": [],
             }
 
-        aliq = getattr(osm, "aliquota_imposto", None)
-        if aliq is None:
             aliq = aliq_padrao
         pct = osm.percentual_comissao if osm.percentual_comissao is not None else mec.percentual_comissao
         tipo_rem = por_mec[mid]["tipo_remuneracao"]
@@ -185,6 +182,21 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if "usuario_id" not in session:
             return redirect("/login")
+        path = request.path or ""
+        livres = ("/assinar", "/logout", "/static", "/uploads")
+        if any(path.startswith(p) for p in livres):
+            return f(*args, **kwargs)
+        eid = session.get("empresa_id")
+        if eid:
+            emp = Empresa.query.get(eid)
+            if emp:
+                venc = getattr(emp, "data_vencimento", None)
+                st = (getattr(emp, "status_pagamento", None) or "").upper()
+                if st in ("TRIAL", "VENCIDO", "BLOQUEADO") or st == "":
+                    if venc and venc < date.today() and st != "ATIVO":
+                        return redirect("/assinar")
+                if emp.ativo is False:
+                    return redirect("/assinar")
         return f(*args, **kwargs)
     return decorated_function
 @app.route("/comissoes")
@@ -215,17 +227,18 @@ def comissoes():
     pagos = {}
     historico = []
     try:
+        ini_dt = datetime.combine(data_ini, datetime.min.time())
+        fim_dt = datetime.combine(data_fim, datetime.min.time())
         hist = PagamentoComissao.query.filter(
             PagamentoComissao.empresa_id == eid,
-            PagamentoComissao.periodo_ini == data_ini,
-            PagamentoComissao.periodo_fim == data_fim,
+            PagamentoComissao.periodo_ini >= ini_dt,
+            PagamentoComissao.periodo_fim <= fim_dt,
         ).order_by(PagamentoComissao.data_pagamento.desc()).all()
         historico = hist
         for p in hist:
             pagos[p.mecanico_id] = pagos.get(p.mecanico_id, 0) + float(p.valor or 0)
     except Exception as e:
         print("Erro pagamentos comissao:", e)
-
     for r in resumo:
         mid = r.get("mecanico_id") or getattr(r.get("mecanico"), "id", None)
         ja_pago = round(pagos.get(mid, 0), 2)
@@ -240,41 +253,6 @@ def comissoes():
             r["situacao"] = "PENDENTE"
     total_pago = sum(r.get("ja_pago", 0) for r in resumo)
     total_saldo = sum(r.get("saldo", 0) for r in resumo)
- 
-    historico = (
-        PagamentoComissao.query.filter_by(empresa_id=eid)
-        .order_by(PagamentoComissao.id.desc())
-        .all()
-    )
-
-    pagos_por_mec = {}
-    total_pago = 0.0
-    for p in historico:
-        v = float(p.valor or getattr(p, "valor_pago", None) or 0)
-        midp = int(p.mecanico_id)
-        pagos_por_mec[midp] = pagos_por_mec.get(midp, 0.0) + v
-        total_pago += v
-
-    for item in resumo:
-        try:
-            mid = int(item.get("mecanico_id") or item.get("id") or 0)
-        except Exception:
-            mid = 0
-        pago = round(pagos_por_mec.get(mid, 0.0), 2)
-        total = float(item.get("total_pagar") or 0)
-        saldo = round(total - pago, 2)
-        item["pago"] = pago
-        item["ja_pago"] = pago
-        item["saldo"] = saldo
-        if saldo <= 0.009:
-            item["situacao"] = "PAGO"
-        elif pago > 0:
-            item["situacao"] = "PARCIAL"
-        else:
-            item["situacao"] = "PENDENTE"
-
-    total_pago = round(total_pago, 2)
-    total_saldo = round(float(total_geral or 0) - total_pago, 2)
 
 
     return render_template(
@@ -505,7 +483,12 @@ def corrigir_colunas_banco():
         if "proxima_revisao_km" not in colunas:
             db.session.execute(text("ALTER TABLE veiculos ADD COLUMN proxima_revisao_km INTEGER"))
             print("✅ veiculos.proxima_revisao_km adicionada")
-
+        if "intervalo_revisao_km" not in colunas:
+            db.session.execute(text("ALTER TABLE veiculos ADD COLUMN intervalo_revisao_km INTEGER DEFAULT 10000"))
+            print(" veiculos.intervalo_revisao_km adicionada")
+        if "intervalo_revisao_meses" not in colunas:
+            db.session.execute(text("ALTER TABLE veiculos ADD COLUMN intervalo_revisao_meses INTEGER DEFAULT 6"))
+            print(" veiculos.intervalo_revisao_meses adicionada")
         if "km" not in colunas:
             db.session.execute(text("ALTER TABLE veiculos ADD COLUMN km INTEGER"))
             print("✅ veiculos.km adicionada")
@@ -1374,10 +1357,17 @@ def novo_veiculo():
             Veiculo.empresa_id == (empresa_atual() or 1)
         ).first()
         if existente:
-            return redirect(f"/veiculos/editar/{existente.id}?aviso=placa_existente")
+            novo_cliente = int(request.form["cliente_id"])
+            if existente.cliente_id == novo_cliente:
+                return redirect(
+                    f"/veiculos/editar/{existente.id}?aviso=placa_mesmo_dono"
+                )
+            return redirect(
+                f"/veiculos/editar/{existente.id}?aviso=placa_outro_dono&novo_cliente={novo_cliente}"
+            )
 
-        data_rev = request.form.get("proxima_revisao_data")
-        km_rev = request.form.get("proxima_revisao_km")
+        intervalo_km = int(request.form.get("intervalo_revisao_km") or 10000)
+        intervalo_meses = int(request.form.get("intervalo_revisao_meses") or 6)
 
         veiculo = Veiculo(
             empresa_id=empresa_atual() or 1,
@@ -1392,11 +1382,22 @@ def novo_veiculo():
             motor=request.form.get("motor"),
             combustivel=request.form.get("combustivel"),
             observacoes=request.form.get("observacoes", ""),
-            proxima_revisao_data=datetime.strptime(data_rev, "%Y-%m-%d").date() if data_rev else None,
-            proxima_revisao_km=int(km_rev) if km_rev else None,
+            intervalo_revisao_km=intervalo_km,
+            intervalo_revisao_meses=intervalo_meses,
         )
-        db.session.add(veiculo)
-        db.session.commit()
+        try:
+            db.session.add(veiculo)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            existente = Veiculo.query.filter_by(
+                placa=placa, empresa_id=(empresa_atual() or 1)
+            ).first()
+            if existente:
+                return redirect(
+                    f"/veiculos/editar/{existente.id}?aviso=placa_outro_dono&novo_cliente={int(request.form['cliente_id'])}"
+                )
+            raise
         return redirect("/veiculos")
     eid = empresa_atual()
     clientes = (
@@ -1416,10 +1417,15 @@ def editar_veiculo(id):
     veiculo = Veiculo.query.filter_by(id=id, empresa_id=eid).first_or_404()
     aviso = request.args.get("aviso")
 
-    if request.method == "POST":
-        data_rev = request.form.get("proxima_revisao_data")
-        km_rev = request.form.get("proxima_revisao_km")
+    if request.method == "GET" and aviso == "placa_outro_dono" and request.args.get("novo_cliente"):
+        if request.args.get("confirmar") == "1":
+            veiculo.cliente_id = int(request.args.get("novo_cliente"))
+            db.session.commit()
+            return redirect(f"/veiculos/editar/{veiculo.id}?aviso=dono_atualizado")
 
+    if request.method == "POST":
+        veiculo.intervalo_revisao_km = int(request.form.get("intervalo_revisao_km") or 10000)
+        veiculo.intervalo_revisao_meses = int(request.form.get("intervalo_revisao_meses") or 6)
         veiculo.cliente_id = int(request.form["cliente_id"])
         veiculo.placa = request.form["placa"].upper()
         veiculo.marca = request.form.get("marca")
@@ -1431,8 +1437,6 @@ def editar_veiculo(id):
         veiculo.motor = request.form.get("motor")
         veiculo.combustivel = request.form.get("combustivel")
         veiculo.observacoes = request.form.get("observacoes", "")
-        veiculo.proxima_revisao_data = datetime.strptime(data_rev, "%Y-%m-%d").date() if data_rev else None
-        veiculo.proxima_revisao_km = int(km_rev) if km_rev else None
         db.session.commit()
         return redirect("/veiculos")
 
@@ -1679,7 +1683,8 @@ def nova_ordem():
         total = total_servicos + valor_pecas - desconto
 
         # Número no padrão 20260001, 20260002...
-        ano = date.today().year
+        from datetime import date as data_hoje
+        ano = data_hoje.today().year
         prefixo = ano * 10000  # 20260000
         ultimo = db.session.query(func.max(OrdemServico.numero)).scalar() or 0
         if ultimo < prefixo:
@@ -1695,7 +1700,6 @@ def nova_ordem():
             defeito_relatado=request.form.get("defeito_relatado"),
             diagnostico=request.form.get("diagnostico"),
             servico_executado=request.form.get("servico_executado"),
-            mecanico=", ".join(dict.fromkeys(nomes)) if nomes else None,
             valor_servicos=total_servicos,
             valor_produtos=valor_pecas,
             desconto=desconto,
@@ -1711,7 +1715,7 @@ def nova_ordem():
         db.session.flush()
 
         agendar = request.form.get("agendar_auto") == "sim"
-        hoje = date.today()
+        hoje = data_hoje.today()
 
         for d in detalhes:
             m = d["mecanico"]
@@ -1847,10 +1851,22 @@ def nova_ordem():
             except Exception as e:
                 print("Erro item OS:", e)
 
+        km_os = int(request.form.get("km") or 0)
+        vid = request.form.get("veiculo_id")
+        if vid and km_os:
+            v = Veiculo.query.get(int(vid))
+            if v:
+                    v.km_atual = km_os
+                    v.km = km_os
+                    intervalo_km = v.intervalo_revisao_km or 10000
+                    intervalo_meses = v.intervalo_revisao_meses or 6
+                    v.proxima_revisao_km = km_os + intervalo_km
+                    from datetime import timedelta
+                    v.proxima_revisao_data = data_hoje.today() + timedelta(days=intervalo_meses * 30)
         db.session.commit()
         return redirect("/ordens")
 
-        eid = empresa_atual()
+    eid = empresa_atual()
     if not eid:
         return redirect("/login")
 
@@ -1890,8 +1906,8 @@ def editar_ordem(id):
         return redirect("/login")
     ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
 
-    # BLOQUEIA EDIÇÃO SE JÁ ESTIVER FINALIZADA
-    if ordem.status == "FINALIZADA":
+    so_ver = request.args.get("ver") == "1" or ordem.status == "FINALIZADA"
+    if so_ver and request.method == "POST":
         return redirect("/ordens")
 
     if request.method == "POST":
@@ -2047,8 +2063,21 @@ def editar_ordem(id):
                 ))
             except Exception as e:
                 print("Erro item OS (edit):", e)
-
-        db.session.commit()
+        km_os = int(request.form.get("km") or 0)
+        vid = request.form.get("veiculo_id")
+        if vid and km_os:
+            v = Veiculo.query.get(int(vid))
+            if vid and km_os:
+                v = Veiculo.query.get(int(vid))
+                if v:
+                    v.km_atual = km_os
+                    intervalo_km = v.intervalo_revisao_km or 10000
+                    intervalo_meses = v.intervalo_revisao_meses or 6
+                    v.proxima_revisao_km = km_os + intervalo_km
+                    from datetime import date as data_hoje
+                    from datetime import timedelta
+                    v.proxima_revisao_data = data_hoje.today() + timedelta(days=intervalo_meses * 30)
+            db.session.commit()
         return redirect("/ordens")
 
     eid = empresa_atual()
@@ -2074,6 +2103,7 @@ def editar_ordem(id):
     return render_template(
         "editar_ordem.html",
         ordem=ordem,
+        so_ver=so_ver,
         clientes=clientes,
         veiculos=veiculos,
         mecanicos=mecanicos,
@@ -2081,6 +2111,31 @@ def editar_ordem(id):
         servicos_os=servicos_os,
         itens_os=itens_os,
     )
+
+def gerar_conta_receber_os(ordem):
+    if not ordem or not getattr(ordem, "cliente_id", None):
+        return
+    existe = ContaReceber.query.filter_by(ordem_servico_id=ordem.id).first()
+    if existe:
+        return
+    valor = float(ordem.valor_total or 0)
+    if valor <= 0:
+        return
+    agora = datetime.now()
+    cr = ContaReceber(
+        empresa_id=ordem.empresa_id,
+        cliente_id=ordem.cliente_id,
+        ordem_servico_id=ordem.id,
+        descricao=f"OS {ordem.numero or ordem.id}",
+        data_emissao=agora,
+        data_vencimento=agora,
+        valor=valor,
+    )
+    if hasattr(cr, "status"):
+        cr.status = "PENDENTE"
+    if hasattr(cr, "valor_pago"):
+        cr.valor_pago = 0
+    db.session.add(cr)
 
 
 
@@ -2092,10 +2147,44 @@ def finalizar_ordem(id):
         return redirect("/login")
     ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
     ordem.status = "FINALIZADA"
+
+    agora = datetime.utcnow()
+    if not getattr(ordem, "data_fechamento", None):
+        ordem.data_fechamento = agora
+    if not getattr(ordem, "data_finalizacao", None):
+        ordem.data_finalizacao = agora
+
+    if not ordem.mecanico_id:
+        mid = None
+        itens = getattr(ordem, "itens", None) or getattr(ordem, "servicos", None) or []
+        for it in itens:
+            mid = getattr(it, "mecanico_id", None)
+            if mid:
+                break
+        if not mid:
+            row = db.session.execute(
+                text(
+                    "SELECT mecanico_id FROM ordem_servico_mecanicos "
+                    "WHERE ordem_servico_id = :oid AND mecanico_id IS NOT NULL LIMIT 1"
+                ),
+                {"oid": ordem.id},
+            ).fetchone()
+            if row:
+                mid = row[0]               
+        if mid:
+            ordem.mecanico_id = mid
+
     db.session.commit()
     return redirect("/ordens")
 
-
+@app.route("/ordens/ver/<int:id>")
+@login_required
+def ver_ordem(id):
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
+    return redirect(f"/ordens/editar/{id}?ver=1")
 @app.route("/ordens/excluir/<int:id>")
 @login_required
 def excluir_ordem(id):
@@ -2801,7 +2890,7 @@ def financeiro():
         saldo_caixa=round(entradas - saidas, 2),
     )
 
-    @app.route("/financeiro/caixa", methods=["POST"])
+@app.route("/financeiro/caixa", methods=["POST"])
 @login_required
 def financeiro_caixa():
     eid = empresa_atual()
@@ -3022,6 +3111,7 @@ def configuracoes():
                     empresa.inscricao_municipal = request.form.get("inscricao_municipal") or None
                     empresa.codigo_servico = request.form.get("codigo_servico") or None
                     empresa.aliquota_iss = request.form.get("aliquota_iss") or 5.00
+                    empresa.aliquota_imposto_comissao = float(request.form.get("aliquota_imposto_comissao") or 6)
                     empresa.regime_tributario = request.form.get("regime_tributario") or "1"
 
                     senha = request.form.get("senha_certificado")
@@ -4072,5 +4162,73 @@ def editar_empresa(id):
             print("Erro ao editar empresa:", e)
 
     return render_template("editar_empresa.html", empresa=empresa)
+@app.route("/teste", methods=["GET", "POST"])
+def teste_gratis():
+    erro = None
+    if request.method == "POST":
+        nome_oficina = (request.form.get("nome_oficina") or "").strip()
+        login = (request.form.get("usuario") or "").strip().lower()
+        senha = request.form.get("senha") or ""
+        senha2 = request.form.get("senha2") or ""
+        email = (request.form.get("email") or "").strip()
+        cnpj = (request.form.get("cnpj") or "").strip()
+        celular = (request.form.get("celular") or "").strip()
+        if not nome_oficina or not login or len(senha) < 6:
+            erro = "Preencha oficina, usuário e senha (mín. 6)."
+        elif senha != senha2:
+            erro = "As senhas não conferem."
+        elif Usuario.query.filter_by(login=login).first():
+            erro = "Este usuário já existe. Escolha outro."
+        elif cnpj and Empresa.query.filter_by(cnpj=cnpj).first():
+            erro = "Este CNPJ/CPF já está cadastrado. Use outro ou deixe em branco."
+        else:
+            try:
+                emp = Empresa(
+                    razao_social=nome_oficina,
+                    nome_fantasia=nome_oficina,
+                    cnpj=cnpj or None,
+                    telefone=celular,
+                    whatsapp=celular,
+                    email=email,
+                    ativo=True,
+                    plano="TRIAL",
+                    status_pagamento="TRIAL",
+                    data_vencimento=date.today() + timedelta(days=7),
+                )
+                db.session.add(emp)
+                db.session.flush()
+                u = Usuario(
+                    empresa_id=emp.id,
+                    nome=request.form.get("nome") or nome_oficina,
+                    login=login,
+                    senha=generate_password_hash(senha),
+                    perfil="ADMIN",
+                    ativo=True,
+                    email=email,
+                )
+                db.session.add(u)
+                db.session.commit()
+                session["usuario_id"] = u.id
+                session["usuario_nome"] = u.nome
+                session["usuario_perfil"] = u.perfil
+                session["empresa_id"] = emp.id
+                return redirect("/")
+            except Exception as e:
+                db.session.rollback()
+                print("Erro trial:", e)
+                erro = f"Não foi possível criar a conta: {e}"
+    return render_template("teste.html", erro=erro)
+
+
+@app.route("/assinar")
+@login_required
+def assinar():
+    eid = session.get("empresa_id")
+    emp = Empresa.query.get(eid) if eid else None
+    return render_template("assinar.html", empresa=emp)
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
