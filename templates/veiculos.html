@@ -50,15 +50,13 @@ Veículos
                     <td>{{ veiculo.ano }}</td>
 
                     <td>
-
-                        <button class="btn btn-sm btn-primary" disabled>
+                        <a href="/veiculos/editar/{{ veiculo.id }}" class="btn btn-sm btn-primary">
                             Editar
-                        </button>
-
-                        <button class="btn btn-sm btn-danger" disabled>
+                        </a>
+                        <a href="/veiculos/excluir/{{ veiculo.id }}" class="btn btn-sm btn-danger"
+                           onclick="return confirm('Excluir este veículo?');">
                             Excluir
-                        </button>
-
+                        </a>
                     </td>
 
                 </tr>

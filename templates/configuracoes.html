@@ -179,6 +179,12 @@
                                 <input type="number" step="0.01" name="aliquota_iss" class="form-control bg-dark text-white border-secondary"
                                        value="{{ empresa.aliquota_iss if empresa and empresa.aliquota_iss else '5.00' }}">
                             </div>
+                <div class="col-md-4">
+                    <label class="form-label text-secondary">Imposto comissão (%)</label>
+                    <input type="number" step="0.01" min="0" name="aliquota_imposto_comissao"
+                           class="form-control bg-dark text-white border-secondary"
+                           value="{{ empresa.aliquota_imposto_comissao if empresa and empresa.aliquota_imposto_comissao is not none else '6.00' }}">
+                </div>
 
                             <div class="col-md-4">
                                 <label class="form-label text-secondary">Regime Tributário</label>

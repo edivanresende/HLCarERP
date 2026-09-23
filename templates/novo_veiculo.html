@@ -26,15 +26,12 @@
 
                 <div class="col-md-6 mb-3">
                     <label class="text-secondary">Cliente</label>
-                    <select name="cliente_id" class="form-control bg-dark text-white border-secondary" required>
-                        <option value="">Selecione...</option>
-                        {% for cliente in clientes %}
-                        <option value="{{ cliente.id }}"
-                            {% if veiculo and veiculo.cliente_id == cliente.id %}selected{% endif %}>
-                            {{ cliente.nome }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                <select name="cliente_id" class="form-control bg-dark text-white" required>
+                    <option value="">Selecione...</option>
+                    {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" {% if veiculo and veiculo.cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nome }}</option>
+                    {% endfor %}
+                </select>
                 </div>
 
                 <div class="col-md-6 mb-3">
@@ -67,19 +64,26 @@
                            value="{{ veiculo.km if veiculo and veiculo.km else '' }}">
                 </div>
 
-                <div class="col-md-4 mb-3">
-                    <label class="text-secondary">Próxima Revisão (Data)</label>
-                    <input type="date" name="proxima_revisao_data"
-                           class="form-control bg-dark text-white border-secondary"
-                           value="{{ veiculo.proxima_revisao_data.strftime('%Y-%m-%d') if veiculo and veiculo.proxima_revisao_data else '' }}">
-                </div>
-
-                <div class="col-md-4 mb-3">
-                    <label class="text-secondary">Próxima Revisão (KM)</label>
-                    <input type="number" name="proxima_revisao_km"
-                           class="form-control bg-dark text-white border-secondary"
-                           value="{{ veiculo.proxima_revisao_km if veiculo and veiculo.proxima_revisao_km else '' }}">
-                </div>
+<div class="col-md-4 mb-3">
+  <label class="text-secondary">Revisão a cada (KM)</label>
+  <input type="number" name="intervalo_revisao_km" class="form-control bg-dark text-white"
+         value="{{ veiculo.intervalo_revisao_km if veiculo and veiculo.intervalo_revisao_km else 10000 }}"
+         min="1" step="1">
+</div>
+<div class="col-md-4 mb-3">
+  <label class="text-secondary">Revisão a cada (meses)</label>
+  <input type="number" name="intervalo_revisao_meses" class="form-control bg-dark text-white"
+         value="{{ veiculo.intervalo_revisao_meses if veiculo and veiculo.intervalo_revisao_meses else 6 }}"
+         min="1" step="1">
+</div>
+{% if veiculo %}
+<p class="text-white col-12">
+  Próxima (calculada na última OS):
+  {{ veiculo.proxima_revisao_km or '—' }} km
+  —
+  {{ veiculo.proxima_revisao_data.strftime('%d/%m/%Y') if veiculo.proxima_revisao_data else '—' }}
+</p>
+{% endif %}
 
                 <div class="col-md-4 mb-3">
                     <label class="text-secondary">Chassi</label>

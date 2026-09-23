@@ -56,7 +56,9 @@
                 <div class="col-12 mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <label class="text-secondary mb-0">Serviços</label>
-                        <button type="button" class="btn btn-sm btn-warning" onclick="adicionarServico()">+ Serviço</button>
+                {% if not so_ver %}
+                <button type="button" class="btn btn-sm btn-warning" onclick="adicionarServico()">+ Serviço</button>
+                {% endif %}
                     </div>
                     <div class="table-responsive rounded" style="background:#0f172a;border:1px solid #333;">
                         <table class="table table-dark table-sm align-middle mb-0">
@@ -146,7 +148,9 @@
             </div>
 
             <div class="d-flex gap-2 mt-3">
+                {% if not so_ver %}
                 <button type="submit" class="btn btn-success">Salvar Alterações</button>
+                {% endif %}
                 <a href="/ordens/{{ ordem.id }}/nfse" class="btn btn-info">Emitir NFS-e</a>
                 <a href="/ordens" class="btn btn-secondary">Cancelar</a>
             </div>
@@ -345,4 +349,15 @@ document.addEventListener('DOMContentLoaded', function () {
     recalcularTotais();
 });
 </script>
+{% if so_ver %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var lista = document.querySelectorAll("#form-os input, #form-os select, #form-os textarea, #form-os button");
+  for (var i = 0; i < lista.length; i++) {
+    if (lista[i].type === "hidden") continue;
+    lista[i].disabled = true;
+  }
+});
+</script>
+{% endif %}
 {% endblock %}

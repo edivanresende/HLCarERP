@@ -133,6 +133,8 @@ class Veiculo(db.Model):
     combustivel = db.Column(db.String(30))
     cambio = db.Column(db.String(30))
     motor = db.Column(db.String(80))
+    intervalo_revisao_km = db.Column(db.Integer, default=10000)
+    intervalo_revisao_meses = db.Column(db.Integer, default=6)
     chassi = db.Column(db.String(40))
     renavam = db.Column(db.String(20))
     km_atual = db.Column(db.Integer, default=0)
