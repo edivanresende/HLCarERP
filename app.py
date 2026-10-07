@@ -5,7 +5,9 @@ from flask import (
     redirect,
     send_file,
     jsonify,
-    session
+    session,
+    url_for,
+    flash
 )
 
 from datetime import datetime, date, timedelta
@@ -177,26 +179,45 @@ def resumo_comissoes_periodo(eid, data_ini, data_fim):
 # AUTENTICAÇÃO
 # ============================================================
 
+PIX_CHAVE = "94996633585"
+PIX_NOME = "HL Car Auto Center"
+PIX_CIDADE = "SUA CIDADE"
+PIX_VALOR = 500.00
+
+def super_admin():
+    return session.get("usuario_perfil") == "SUPER"
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "usuario_id" not in session:
             return redirect("/login")
+
         path = request.path or ""
-        livres = ("/assinar", "/logout", "/static", "/uploads")
+        livres = ("/assinar", "/logout", "/static", "/uploads", "/login")
         if any(path.startswith(p) for p in livres):
             return f(*args, **kwargs)
+
+        # SUPER nunca é bloqueado
+        if session.get("usuario_perfil") == "SUPER":
+            return f(*args, **kwargs)
+
         eid = session.get("empresa_id")
         if eid:
             emp = Empresa.query.get(eid)
             if emp:
-                venc = getattr(emp, "data_vencimento", None)
-                st = (getattr(emp, "status_pagamento", None) or "").upper()
-                if st in ("TRIAL", "VENCIDO", "BLOQUEADO") or st == "":
-                    if venc and venc < date.today() and st != "ATIVO":
-                        return redirect("/assinar")
-                if emp.ativo is False:
+                if getattr(emp, "ativo", True) is False:
                     return redirect("/assinar")
+                venc = getattr(emp, "data_vencimento", None)
+                if venc:
+                    from datetime import date
+                    dv = venc.date() if hasattr(venc, "date") else venc
+                    if dv < date.today():
+                        return redirect("/assinar")
+                st = (getattr(emp, "status_pagamento", None) or "").upper()
+                if st in ("VENCIDO", "CANCELADO", "INADIMPLENTE", "INATIVO"):
+                    return redirect("/assinar")
+
         return f(*args, **kwargs)
     return decorated_function
 @app.route("/comissoes")
@@ -389,7 +410,7 @@ def criar_admin_se_nao_existir():
                 nome="Administrador",
                 login="admin",
                 senha=generate_password_hash("admin123"),
-                perfil="ADMIN",
+                perfil="SUPER",
                 ativo=True
             )
             db.session.add(admin)
@@ -397,6 +418,10 @@ def criar_admin_se_nao_existir():
             print("✅ Usuário admin criado!")
             print("   Login: admin")
             print("   Senha: admin123")
+        elif admin.perfil != "SUPER":
+            admin.perfil = "SUPER"
+            db.session.commit()
+            print("Admin promovido a SUPER")
     except Exception as e:
         print("Erro ao criar admin:", e)
         db.session.rollback()
@@ -615,7 +640,8 @@ def dashboard():
     eid = empresa_atual()
     if not eid:
         return redirect("/login")
-
+    if session.get("usuario_perfil") == "MECANICO":
+        return redirect("/ordens")
     from collections import defaultdict
 
     data_ini = request.args.get("data_ini") or date.today().replace(day=1).isoformat()
@@ -1212,7 +1238,126 @@ def dashboard():
         agendamentos_hoje=agendamentos_hoje,
         agendamentos_amanha=agendamentos_amanha,
     )
+@app.route("/dashboard/mecanicos")
+@login_required
+def dashboard_mecanicos():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    if session.get("usuario_perfil") == "MECANICO":
+        return redirect("/ordens")
 
+    mecanicos = Mecanico.query.filter_by(empresa_id=eid).order_by(Mecanico.nome).all()
+    nomes = [m.nome for m in mecanicos]
+    salarios = [float(m.salario or 0) for m in mecanicos]
+    comissoes = [float(m.percentual_comissao or 0) for m in mecanicos]
+    folha = sum(salarios)
+    so_salario = sum(1 for m in mecanicos if m.forma_pagamento == "salario")
+    so_comissao = sum(1 for m in mecanicos if m.forma_pagamento == "comissao")
+    misto = len(mecanicos) - so_salario - so_comissao
+    ativos = sum(1 for m in mecanicos if m.ativo)
+
+    return render_template(
+        "dashboard_mecanicos.html",
+        mecanicos=mecanicos,
+        nomes=nomes,
+        salarios=salarios,
+        comissoes=comissoes,
+        folha=folha,
+        so_salario=so_salario,
+        so_comissao=so_comissao,
+        misto=misto,
+        ativos=ativos,
+    )
+
+@app.route("/dashboard/ordens")
+@login_required
+def dashboard_ordens():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    if session.get("usuario_perfil") == "MECANICO":
+        return redirect("/ordens")
+
+    ordens = OrdemServico.query.filter_by(empresa_id=eid).order_by(OrdemServico.id.desc()).all()
+    por_status = {}
+    for o in ordens:
+        st = o.status or "Sem status"
+        por_status[st] = por_status.get(st, 0) + 1
+
+    return render_template(
+        "dashboard_ordens.html",
+        ordens=ordens[:30],
+        total=len(ordens),
+        labels=list(por_status.keys()),
+        valores=list(por_status.values()),
+    )
+
+@app.route("/dashboard/financeiro")
+@login_required
+def dashboard_financeiro():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    if session.get("usuario_perfil") == "MECANICO":
+        return redirect("/ordens")
+
+    periodo = request.args.get("periodo") or "todos"
+    hoje = date.today()
+    ini = fim = None
+    if periodo == "hoje":
+        ini = fim = hoje
+    elif periodo == "semana":
+        ini = hoje - timedelta(days=hoje.weekday())
+        fim = hoje
+    elif periodo == "mes":
+        ini = hoje.replace(day=1)
+        fim = hoje
+    elif periodo == "ano":
+        ini = date(hoje.year, 1, 1)
+        fim = hoje
+
+    def data_os(o):
+        for campo in ("data_finalizacao", "data_fechamento", "data_abertura", "data", "criado_em"):
+            valor = getattr(o, campo, None)
+            if valor:
+                return valor.date() if hasattr(valor, "date") else valor
+        return None
+
+    def valor_os(o):
+        return float(getattr(o, "valor_total", 0) or getattr(o, "total", 0) or getattr(o, "valor", 0) or 0)
+
+    ordens = OrdemServico.query.filter_by(empresa_id=eid).all()
+    if ini and fim:
+        do_periodo = [o for o in ordens if data_os(o) and ini <= data_os(o) <= fim]
+    else:
+        do_periodo = ordens
+
+    finalizadas = [o for o in do_periodo if o.status == "FINALIZADA"]
+    abertas = [o for o in do_periodo if o.status == "ABERTA"]
+    faturamento = sum(valor_os(o) for o in finalizadas)
+    ticket = faturamento / len(finalizadas) if finalizadas else 0
+
+    por_mec = {}
+    for o in finalizadas:
+        nome = o.mecanico_ref.nome if getattr(o, "mecanico_ref", None) else "Sem mecânico"
+        por_mec[nome] = por_mec.get(nome, 0) + valor_os(o)
+
+    return render_template(
+        "dashboard_financeiro.html",
+        periodo=periodo,
+        ini=ini.strftime("%d/%m/%Y") if ini else "tudo",
+        fim=fim.strftime("%d/%m/%Y") if fim else "",
+        faturamento=faturamento,
+        ticket=ticket,
+        qtd_abertas=len(abertas),
+        qtd_finalizadas=len(finalizadas),
+        aberto_valor=sum(valor_os(o) for o in abertas),
+        nomes=list(por_mec.keys()),
+        valores=list(por_mec.values()),
+        ordens=sorted(finalizadas, key=valor_os, reverse=True)[:20],
+        valor_os=valor_os,
+    )
 
 @app.route("/ordens/retrabalho/<int:id>", methods=["POST"])
 @login_required
@@ -1501,13 +1646,27 @@ def ordens():
             if data_fim:
                 df = datetime.strptime(data_fim, "%Y-%m-%d").date()
                 query = query.filter(func.date(OrdemServico.data_abertura) <= df)
-        except:
+        except Exception:
             pass
 
     if status:
         query = query.filter(OrdemServico.status == status)
 
-    lista_ordens = query.order_by(OrdemServico.id.desc()).all()
+    perfil = (session.get("usuario_perfil") or "").upper()
+    lista_ordens = []
+
+    if perfil == "MECANICO":
+        nome = (session.get("usuario_nome") or "").strip()
+        mec = Mecanico.query.filter_by(empresa_id=eid, nome=nome).first()
+        if mec:
+            ids = [
+                row.ordem_servico_id
+                for row in OrdemServicoMecanico.query.filter_by(mecanico_id=mec.id).all()
+            ]
+            if ids:
+                lista_ordens = query.filter(OrdemServico.id.in_(ids)).order_by(OrdemServico.id.desc()).all()
+    else:
+        lista_ordens = query.order_by(OrdemServico.id.desc()).all()
 
     return render_template(
         "ordens.html",
@@ -3049,7 +3208,8 @@ def excluir_usuario(id):
 @app.route("/configuracoes", methods=["GET", "POST"])
 @login_required
 def configuracoes():
-    empresa = Empresa.query.first()
+    import os
+    empresa = Empresa.query.get(session.get("empresa_id"))
     usuario = Usuario.query.get(session.get("usuario_id"))
     mensagem = None
     erro = None
@@ -3079,7 +3239,16 @@ def configuracoes():
                 empresa.cidade = request.form.get("cidade")
                 empresa.estado = request.form.get("estado")
                 empresa.url_nfse = request.form.get("url_nfse") or None
-
+                empresa.estado = request.form.get("estado")
+                empresa.url_nfse = request.form.get("url_nfse") or None
+                f = request.files.get("logo")
+                if f and f.filename:
+                    ext = f.filename.rsplit(".", 1)[-1].lower()
+                    if ext in ("png", "jpg", "jpeg", "webp"):
+                        pasta = os.path.join(app.static_folder, "uploads", "logos")
+                        os.makedirs(pasta, exist_ok=True)
+                        caminho = os.path.join(pasta, f"{empresa.id}.{ext}")
+                        f.save(caminho)
                 db.session.commit()
                 mensagem = "Dados da empresa salvos com sucesso!"
             except Exception as e:
@@ -3839,6 +4008,24 @@ def lembretes_marcar_enviado():
 
     return redirect("/lembretes")
 @app.context_processor
+def inject_empresa():
+    import os
+    eid = session.get("empresa_id")
+    emp = Empresa.query.get(eid) if eid else None
+    nome = "HLCarERP"
+    logo_url = None
+    if emp:
+        nome = emp.nome_fantasia or emp.razao_social or "HLCarERP"
+    if eid:
+        pasta = os.path.join(app.root_path, "static", "uploads", "logos")
+        for ext in ("png", "jpg", "jpeg", "webp"):
+            caminho = os.path.join(pasta, f"{eid}.{ext}")
+            if os.path.isfile(caminho):
+                logo_url = url_for("static", filename=f"uploads/logos/{eid}.{ext}")
+                break
+    return {"empresa_nome": nome, "empresa_logo": logo_url, "empresa": emp}
+
+@app.context_processor
 def inject_lembretes_pendentes():
     try:
         eid = session.get("empresa_id")
@@ -4074,7 +4261,7 @@ def checklist_pdf(id):
 @login_required
 def listar_empresas():
     # Só ADMIN pode ver
-    if session.get("usuario_perfil") != "ADMIN":
+    if not super_admin():
         return redirect("/")
 
     empresas = Empresa.query.order_by(Empresa.nome_fantasia).all()
@@ -4084,7 +4271,7 @@ def listar_empresas():
 @app.route("/empresas/nova", methods=["GET", "POST"])
 @login_required
 def nova_empresa():
-    if session.get("usuario_perfil") != "ADMIN":
+    if not super_admin():
         return redirect("/")
 
     if request.method == "POST":
@@ -4123,13 +4310,13 @@ def nova_empresa():
         except Exception as e:
             db.session.rollback()
             print("Erro ao criar empresa:", e)
-            return render_template("nova_empresa.html", erro="Erro ao salvar. Verifique se o login já existe.")
+            return render_template("nova_empresa.html", erro=str(e))
 
     return render_template("nova_empresa.html")
 @app.route("/empresas/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_empresa(id):
-    if session.get("usuario_perfil") != "ADMIN":
+    if not super_admin():
         return redirect("/")
 
     empresa = Empresa.query.get_or_404(id)
@@ -4225,9 +4412,265 @@ def teste_gratis():
 def assinar():
     eid = session.get("empresa_id")
     emp = Empresa.query.get(eid) if eid else None
-    return render_template("assinar.html", empresa=emp)
+    return render_template(
+        "assinar.html",
+        empresa=emp,
+        valor=PIX_VALOR,
+        pix_chave=PIX_CHAVE,
+        pix_nome=PIX_NOME,
+    )
 
 
+@app.route("/assinar/informe-pagamento", methods=["POST"])
+@login_required
+def assinar_informe():
+    eid = session.get("empresa_id")
+    emp = Empresa.query.get(eid) if eid else None
+    if emp:
+        st = (emp.status_pagamento or "").upper()
+        if st != "AGUARDANDO_PIX":
+            emp.status_pagamento = "AGUARDANDO_PIX"
+            obs = emp.observacoes_internas or ""
+            emp.observacoes_internas = (obs + f"\n[{datetime.now()}] Cliente informou PIX.").strip()
+            db.session.commit()
+    return redirect("/assinar")
+
+
+@app.route("/empresas/<int:id>/confirmar-pix", methods=["POST"])
+@login_required
+def confirmar_pix(id):
+    if not super_admin():
+        return redirect("/")
+    emp = Empresa.query.get_or_404(id)
+    hoje = date.today()
+    base = emp.data_vencimento if emp.data_vencimento and emp.data_vencimento > hoje else hoje
+    emp.data_vencimento = base + timedelta(days=30)
+    emp.status_pagamento = "ATIVO"
+    emp.plano = "MENSAL" if (not emp.plano or emp.plano == "TRIAL") else emp.plano
+    emp.ativo = True
+    obs = emp.observacoes_internas or ""
+    emp.observacoes_internas = (obs + f"\n[{datetime.now()}] PIX confirmado até {emp.data_vencimento}.").strip()
+    db.session.commit()
+    return redirect(f"/empresas/editar/{id}?sucesso=1")
+def _hora_min(h):
+    if h is None or h == "":
+        return 0
+    if hasattr(h, "hour"):
+        return h.hour * 60 + h.minute
+    h = str(h)[:5]
+    hh, mm = h.split(":")
+    return int(hh) * 60 + int(mm)
+
+def _agenda_conflito(eid, mecanico_id, data, hora_inicio, duracao, ignorar_id=None):
+    ini = _hora_min(hora_inicio)
+    fim = ini + int(duracao or 40)
+    q = Agendamento.query.filter_by(empresa_id=eid, mecanico_id=mecanico_id, data=data)
+    if ignorar_id:
+        q = q.filter(Agendamento.id != ignorar_id)
+    for a in q.all():
+        a_ini = _hora_min(a.hora_inicio)
+        a_fim = a_ini + int(a.duracao_estimada_min or 40)
+        if ini < a_fim and fim > a_ini:
+            return a
+    return None
+
+def _horarios_livres(eid, mecanico_id, data, duracao=40):
+    mec = Mecanico.query.filter_by(id=mecanico_id, empresa_id=eid).first()
+    if not mec:
+        return []
+    dias = (getattr(mec, "dias_semana", None) or "1,2,3,4,5,6")
+    # 0=seg ... 6=dom  (Python weekday)
+    mapa = {0: "1", 1: "2", 2: "3", 3: "4", 4: "5", 5: "6", 6: "0"}
+    if str(mapa[data.weekday()]) not in str(dias):
+        return []
+    ocupados = Agendamento.query.filter_by(
+        empresa_id=eid, mecanico_id=mecanico_id, data=data
+    ).all()
+    ini_dia = _hora_min(getattr(mec, "horario_inicio", None) or "08:00")
+    fim_dia = _hora_min(getattr(mec, "horario_fim", None) or "18:00")
+    alm_ini = _hora_min(getattr(mec, "intervalo_inicio", None) or "12:00")
+    alm_fim = _hora_min(getattr(mec, "intervalo_fim", None) or "13:00")
+    dur = int(duracao or 40)
+    passo = 30
+    livres = []
+    t = ini_dia
+    while t + dur <= fim_dia:
+        hh, mm = divmod(t, 60)
+        hora = f"{hh:02d}:{mm:02d}"
+        no_almoco = t < alm_fim and t + dur > alm_ini
+        choque = False
+        for a in ocupados:
+            a_ini = _hora_min(a.hora_inicio)
+            a_fim = a_ini + int(a.duracao_estimada_min or 40)
+            if t < a_fim and t + dur > a_ini:
+                choque = True
+                break
+        if not no_almoco and not choque:
+            livres.append(hora)
+        t += passo
+    return livres
+@app.route("/agenda", methods=["GET", "POST"])
+@login_required
+def agenda_page():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
+    perfil = (session.get("usuario_perfil") or "").upper()
+    nome = (session.get("usuario_nome") or "").strip()
+
+    if request.method == "POST" and perfil != "MECANICO":
+        data = datetime.strptime(request.form.get("data"), "%Y-%m-%d").date()
+        hora = (request.form.get("hora_inicio") or "")[:5]
+        mid = int(request.form.get("mecanico_id"))
+        dur = int(request.form.get("duracao") or 40)
+        choque = _agenda_conflito(eid, mid, data, hora, dur)
+        if choque:
+            flash(
+                f"Horário ocupado. Já existe '{choque.descricao or 'serviço'}' às {choque.hora_inicio}.",
+                "danger",
+            )
+            return redirect("/agenda")
+        ag = Agendamento(
+            empresa_id=eid,
+            mecanico_id=mid,
+            data=data,
+            hora_inicio=hora,
+            duracao_estimada_min=dur,
+            descricao=request.form.get("descricao") or "",
+            status="AGENDADO",
+        )
+        db.session.add(ag)
+        db.session.commit()
+        flash("Agendado com sucesso.", "success")
+        return redirect("/agenda")
+
+    q = Agendamento.query.filter_by(empresa_id=eid)
+    if perfil == "MECANICO":
+        mec = Mecanico.query.filter_by(empresa_id=eid, nome=nome).first()
+        if mec:
+            q = q.filter_by(mecanico_id=mec.id)
+        else:
+            q = q.filter_by(mecanico_id=-1)
+        itens = q.order_by(Agendamento.data.desc(), Agendamento.hora_inicio.asc()).all()
+        return render_template("agenda_mecanico.html", itens=itens)
+
+    itens = q.order_by(Agendamento.data.desc(), Agendamento.hora_inicio.asc()).all()
+    mecanicos = Mecanico.query.filter_by(empresa_id=eid).all()
+    return render_template("agenda_oficina.html", itens=itens, mecanicos=mecanicos)
+@app.route("/agenda/<int:aid>/status", methods=["POST"])
+@login_required
+def agenda_status(aid):
+    eid = empresa_atual()
+    ag = Agendamento.query.filter_by(id=aid, empresa_id=eid).first_or_404()
+    novo = (request.form.get("status") or "").upper()
+    if novo in ("AGENDADO", "CONFIRMADO", "EM_ANDAMENTO", "CONCLUIDO", "FALTOU", "CANCELADO"):
+        ag.status = novo
+        db.session.commit()
+        flash("Status atualizado.", "success")
+    return redirect(request.referrer or "/agenda")
+
+@app.route("/agenda/<int:aid>/abrir-os", methods=["POST"])
+@login_required
+def agenda_abrir_os(aid):
+    eid = empresa_atual()
+    ag = Agendamento.query.filter_by(id=aid, empresa_id=eid).first()
+    if not ag:
+        flash("Agendamento não encontrado.", "danger")
+        return redirect(url_for("agenda_page"))
+    if ag.ordem_servico_id:
+        return redirect(url_for("editar_ordem", id=ag.ordem_servico_id))
+    cli = ag.cliente_id
+    if not cli:
+        c = Cliente.query.filter_by(empresa_id=eid).first()
+        cli = c.id if c else None
+    if not cli:
+        flash("Cadastre um cliente antes de abrir OS.", "danger")
+        return redirect(url_for("agenda_page"))
+
+    vei = ag.veiculo_id
+    if not vei:
+        v = Veiculo.query.filter_by(empresa_id=eid).first()
+        if not v and cli:
+            v = Veiculo.query.filter_by(cliente_id=cli).first()
+        vei = v.id if v else None
+    if not vei:
+        flash("Cadastre um veículo antes de abrir OS.", "danger")
+        return redirect(url_for("agenda_page"))
+
+    try:
+        ano = datetime.now().year
+        n = 1
+        for o in OrdemServico.query.filter_by(empresa_id=eid).all():
+            s = str(o.numero or "")
+            if s.startswith(str(ano)) and len(s) >= 8:
+                try:
+                    seq = int(s[-4:]) + 1
+                    if seq > n:
+                        n = seq
+                except Exception:
+                    pass
+        numero_os = f"{ano}{n:04d}"
+        dados = {"empresa_id": eid}
+        pares = [
+            ("numero", numero_os),
+            ("status", "ABERTA"),
+            ("mecanico_id", ag.mecanico_id),
+            ("cliente_id", cli),
+            ("veiculo_id", vei),
+            ("descricao", ag.descricao),
+            ("observacoes", ag.descricao),
+            ("problema_relatado", ag.descricao),
+        ]
+        for nome, val in pares:
+            if hasattr(OrdemServico, nome) and val is not None:
+                dados[nome] = val
+        os_ = OrdemServico(**dados)
+        db.session.add(os_)
+        db.session.flush()
+        ag.ordem_servico_id = os_.id
+        ag.status = "EM_ANDAMENTO"
+        db.session.commit()
+        return redirect(url_for("editar_ordem", id=os_.id))
+    except Exception as e:
+        db.session.rollback()
+        print("ABRIR OS:", repr(e))
+        flash(str(e), "danger")
+        return redirect(url_for("agenda_page"))
+@app.route("/api/agenda/horarios")
+@login_required
+def api_agenda_horarios():
+    eid = empresa_atual()
+    mid = request.args.get("mecanico_id", type=int)
+    data = request.args.get("data")
+    dur = request.args.get("duracao", default=40, type=int)
+    if not eid or not mid or not data or len(str(data)) != 10:
+        return jsonify({"horarios": []})
+    try:
+        d = datetime.strptime(data, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"horarios": []})
+    return jsonify({"horarios": _horarios_livres(eid, mid, d, dur)})
+def ensure_agenda_extra():
+    from sqlalchemy import text
+    pares = [
+        ("agendamentos", "status", "VARCHAR(20) DEFAULT 'AGENDADO'"),
+        ("agendamentos", "ordem_id", "INTEGER"),
+        ("agendamentos", "cliente_id", "INTEGER"),
+        ("agendamentos", "veiculo_id", "INTEGER"),
+        ("agendamentos", "telefone", "VARCHAR(20)"),
+        ("ordens_servico", "checklist_json", "TEXT"),
+    ]
+    with db.engine.connect() as c:
+        for tabela, col, tipo in pares:
+            try:
+                c.execute(text(f"ALTER TABLE {tabela} ADD COLUMN {col} {tipo}"))
+                c.commit()
+            except Exception:
+                c.rollback()
+
+with app.app_context():
+    ensure_agenda_extra()
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))

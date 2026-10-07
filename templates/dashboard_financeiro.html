@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="text-warning mb-0">Financeiro</h4>
+        <a href="/" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+
+    <div class="mb-3">
+        <a href="/dashboard/financeiro?periodo=hoje" class="btn btn-sm {{ 'btn-warning' if periodo == 'hoje' else 'btn-outline-secondary' }}">Hoje</a>
+        <a href="/dashboard/financeiro?periodo=semana" class="btn btn-sm {{ 'btn-warning' if periodo == 'semana' else 'btn-outline-secondary' }}">Semana</a>
+        <a href="/dashboard/financeiro?periodo=mes" class="btn btn-sm {{ 'btn-warning' if periodo == 'mes' else 'btn-outline-secondary' }}">Mês</a>
+        <a href="/dashboard/financeiro?periodo=ano" class="btn btn-sm {{ 'btn-warning' if periodo == 'ano' else 'btn-outline-secondary' }}">Ano</a>
+        <span class="text-secondary ms-2">{{ ini }} a {{ fim }}</span>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary p-3">
+                <div class="text-secondary">Faturado no período</div>
+                <div class="fs-4 text-warning">R$ {{ "%.2f"|format(faturamento) }}</div>
+                <div class="small text-secondary">{{ qtd_finalizadas }} OS finalizadas</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary p-3">
+                <div class="text-secondary">Ticket médio</div>
+                <div class="fs-4 text-white">R$ {{ "%.2f"|format(ticket) }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary p-3">
+                <div class="text-secondary">Ainda aberto</div>
+                <div class="fs-4 text-info">R$ {{ "%.2f"|format(aberto_valor) }}</div>
+                <div class="small text-secondary">{{ qtd_abertas }} OS abertas</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary p-3">
+                <div class="text-secondary">Conversão</div>
+                <div class="fs-4 text-white">{{ "%.0f"|format(100 * qtd_finalizadas / (qtd_finalizadas + qtd_abertas) if (qtd_finalizadas + qtd_abertas) else 0) }}%</div>
+                <div class="small text-secondary">finalizadas sobre o período</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary p-3 mb-3" style="height: 300px;">
+        <canvas id="chartMec"></canvas>
+    </div>
+
+    <div class="card bg-dark border-secondary">
+        <div class="card-header text-white">OS finalizadas que formam o faturamento</div>
+        <div class="table-responsive">
+            <table class="table table-dark table-sm mb-0">
+                <thead><tr><th>OS</th><th>Mecânico</th><th>Valor</th></tr></thead>
+                <tbody>
+                    {% for o in ordens %}
+                    <tr>
+                        <td>{{ o.id }}</td>
+                        <td>{{ o.mecanico_ref.nome if o.mecanico_ref else "-" }}</td>
+                        <td>R$ {{ "%.2f"|format(valor_os(o)) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="text-secondary">Nenhuma OS finalizada neste período.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById("chartMec"), {
+    type: "bar",
+    data: {
+        labels: {{ nomes|tojson }},
+        datasets: [{ label: "Faturado por mecânico (R$)", data: {{ valores|tojson }}, backgroundColor: "#ffc107" }]
+    },
+    options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: "#ddd" } } }, scales: { x: { ticks: { color: "#ddd" } }, y: { ticks: { color: "#ddd" } } } }
+});
+</script>
+{% endblock %}

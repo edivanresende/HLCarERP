@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block conteudo %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="text-warning mb-0">Ordens de serviço</h4>
+        <a href="/" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary p-3">
+                <div class="text-secondary">Total de ordens</div>
+                <div class="fs-4 text-white">{{ total }}</div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card bg-dark border-secondary p-3" style="height: 280px;">
+                <canvas id="chartStatus"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>OS</th>
+                        <th>Status</th>
+                        <th>Mecânico</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in ordens %}
+                    <tr>
+                        <td>{{ o.id }}</td>
+                        <td>{{ o.status }}</td>
+                        <td>{{ o.mecanico_id or "-" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3">Nenhuma ordem.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById("chartStatus"), {
+    type: "doughnut",
+    data: {
+        labels: {{ labels|tojson }},
+        datasets: [{ data: {{ valores|tojson }}, backgroundColor: ["#ffc107", "#0d6efd", "#20c997", "#dc3545", "#6c757d"] }]
+    },
+    options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: "#ddd" } } } }
+});
+</script>
+{% endblock %}
