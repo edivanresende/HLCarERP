@@ -237,9 +237,6 @@ display:none;
 
         {% if pode_usuarios %}
         <li><a href="/usuarios"><i class="fa fa-user-cog me-2"></i> Usuários</a></li>
-        {% endif %}
-
-        {% if perfil == 'SUPER' or session.get('usuario_perfil') == 'SUPER' %}
         <li><a href="/empresas"><i class="fa fa-building me-2"></i> Empresas</a></li>
         {% endif %}
     </ul>
