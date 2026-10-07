@@ -57,6 +57,7 @@
                         <th>Comissão</th>
                         <th>Horário</th>
                         <th>Status</th>
+                        <th>Holerite</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -73,6 +74,7 @@
                         <td>{{ m.percentual_comissao or 0 }}%</td>
                         <td>{{ "%02d"|format(m.hora_entrada or 9) }}:00 – {{ "%02d"|format(m.hora_saida or 18) }}:00</td>
                         <td>{{ "Ativo" if m.ativo else "Inativo" }}</td>
+                        <td><a href="/mecanicos/{{ m.id }}/holerite" class="btn btn-sm btn-outline-info">Holerite</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -80,7 +82,28 @@
         </div>
     </div>
 </div>
-
+<div class="card bg-dark border-secondary mt-3">
+    <div class="card-header text-white">Mão de obra, sem peça</div>
+    <div class="table-responsive">
+        <table class="table table-dark table-sm mb-0">
+            <thead>
+                <tr><th>Mecânico</th><th>Mão de obra faturada</th><th>Custo dele</th><th>Resultado</th><th>Abertas</th><th>Finalizadas</th></tr>
+            </thead>
+            <tbody>
+                {% for m in producao %}
+                <tr>
+                    <td>{{ m.nome }}</td>
+                    <td>R$ {{ "%.2f"|format(m.faturado) }}</td>
+                    <td>R$ {{ "%.2f"|format(m.custo) }}</td>
+                    <td class="{{ 'text-success' if m.resultado >= 0 else 'text-danger' }}">R$ {{ "%.2f"|format(m.resultado) }}</td>
+                    <td>{{ m.abertas }}</td>
+                    <td>{{ m.finalizadas }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 new Chart(document.getElementById("chartSalario"), {

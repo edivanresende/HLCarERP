@@ -3182,6 +3182,7 @@ def novo_usuario():
 @app.route("/usuarios/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_usuario(id):
+    eid = session.get("empresa_id")
     usuario = Usuario.query.filter_by(id=id, empresa_id=eid).first_or_404()
     if request.method == "POST":
         try:
@@ -3205,6 +3206,7 @@ def editar_usuario(id):
 @app.route("/usuarios/resetar-senha/<int:id>")
 @login_required
 def resetar_senha(id):
+    eid = session.get("empresa_id")
     usuario = Usuario.query.filter_by(id=id, empresa_id=eid).first_or_404()
     usuario.senha = generate_password_hash("123456")
     db.session.commit()
@@ -3331,7 +3333,43 @@ def configuracoes():
         mensagem=mensagem,
         erro=erro
     )
+@app.route("/mecanicos/<int:id>/holerite")
+@login_required
+def holerite_mecanico(id):
+    from datetime import datetime
+    eid = empresa_atual()
+    mecanico = Mecanico.query.filter_by(id=id, empresa_id=eid).first_or_404()
+    empresa = Empresa.query.get(eid)
 
+    mes = request.args.get("mes") or datetime.now().strftime("%Y-%m")
+    ano, mes_n = [int(x) for x in mes.split("-")]
+    inicio = datetime(ano, mes_n, 1)
+    fim = datetime(ano + 1, 1, 1) if mes_n == 12 else datetime(ano, mes_n + 1, 1)
+
+    ordens = OrdemServico.query.filter_by(
+        empresa_id=eid, mecanico_id=mecanico.id, status="FINALIZADA"
+    ).all()
+    linhas = []
+    for o in ordens:
+        data = o.data_finalizacao or o.data_abertura
+        if not data or not (inicio <= data < fim):
+            continue
+        valor = float(o.valor_servicos or 0)
+        linhas.append({"numero": o.numero, "data": data, "valor": valor})
+    linhas.sort(key=lambda x: x["data"])
+
+    servicos = sum(x["valor"] for x in linhas)
+    forma = mecanico.forma_pagamento or "comissao"
+    salario = float(mecanico.salario or 0) if forma in ("salario", "misto") else 0
+    comissao = servicos * float(mecanico.percentual_comissao or 0) / 100 if forma in ("comissao", "misto") else 0
+    total = salario + comissao
+
+    return render_template(
+        "holerite_mecanico.html",
+        mecanico=mecanico, empresa=empresa, mes=mes,
+        linhas=linhas, servicos=servicos,
+        salario=salario, comissao=comissao, total=total,
+    )
 
 @app.route("/mecanicos")
 @login_required

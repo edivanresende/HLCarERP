@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Holerite {{ mecanico.nome }}</title>
+<style>
+body { font-family: Arial, sans-serif; color: #111; margin: 24px; }
+.no-print { margin-bottom: 16px; }
+.via { border: 1px solid #333; padding: 16px; margin-bottom: 28px; page-break-inside: avoid; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+th, td { border-bottom: 1px solid #ccc; padding: 6px; text-align: left; font-size: 13px; }
+.total { font-size: 16px; font-weight: bold; margin-top: 12px; }
+.assinatura { margin-top: 48px; display: flex; gap: 40px; }
+.assinatura div { flex: 1; border-top: 1px solid #111; padding-top: 6px; font-size: 12px; }
+@media print { .no-print { display: none; } }
+</style>
+</head>
+<body>
+<div class="no-print">
+    <form method="get">
+        <input type="month" name="mes" value="{{ mes }}">
+        <button type="submit">Ver</button>
+        <button type="button" onclick="window.print()">Imprimir as duas vias</button>
+        <a href="/mecanicos">Voltar</a>
+    </form>
+</div>
+
+{% for titulo in ["VIA DA OFICINA", "VIA DO MECÂNICO"] %}
+<div class="via">
+    <h1>Holerite — {{ titulo }}</h1>
+    <div>{{ empresa.nome_fantasia if empresa else "Oficina" }} · Competência {{ mes }}</div>
+    <p><b>{{ mecanico.nome }}</b><br>
+    Pagamento:
+    {% if mecanico.forma_pagamento == "salario" %}só salário
+    {% elif mecanico.forma_pagamento == "comissao" %}só comissão ({{ mecanico.percentual_comissao or 0 }}%)
+    {% else %}salário + comissão ({{ mecanico.percentual_comissao or 0 }}%){% endif %}
+    </p>
+    <table>
+        <tr><th>OS</th><th>Data</th><th>Mão de obra</th></tr>
+        {% for l in linhas %}
+        <tr>
+            <td>{{ l.numero }}</td>
+            <td>{{ l.data.strftime("%d/%m/%Y") }}</td>
+            <td>R$ {{ "%.2f"|format(l.valor) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">Nenhuma OS finalizada neste mês.</td></tr>
+        {% endfor %}
+    </table>
+    <p>Serviços: R$ {{ "%.2f"|format(servicos) }}<br>
+    Salário: R$ {{ "%.2f"|format(salario) }}<br>
+    Comissão: R$ {{ "%.2f"|format(comissao) }}</p>
+    <div class="total">Líquido a receber: R$ {{ "%.2f"|format(total) }}</div>
+    <div class="assinatura">
+        <div>Mecânico — recebi a via</div>
+        <div>Oficina</div>
+    </div>
+</div>
+{% endfor %}
+</body>
+</html>

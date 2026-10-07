@@ -19,7 +19,7 @@
                     <th>Horário</th>
                     <th>Almoço</th>
                     <th>Status</th>
-                    <th width="140">Ações</th>
+                    <th width="220">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -42,6 +42,7 @@
                         {% else %}<span class="badge bg-secondary">Inativo</span>{% endif %}
                     </td>
                     <td>
+                        <a href="/mecanicos/{{ m.id }}/holerite" class="btn btn-sm btn-outline-info">Holerite</a>
                         <a href="/mecanicos/editar/{{ m.id }}" class="btn btn-sm btn-outline-warning">Editar</a>
                         <a href="/mecanicos/excluir/{{ m.id }}" class="btn btn-sm btn-outline-danger"
                            onclick="return confirm('Excluir este mecânico?')">Excluir</a>
