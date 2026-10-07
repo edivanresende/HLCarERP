@@ -687,9 +687,11 @@ class Agendamento(db.Model):
     duracao_estimada_min = db.Column(db.Integer, default=40)
     duracao_real_min = db.Column(db.Integer)
     hora_fim = db.Column(db.String(5))
-
     descricao = db.Column(db.String(250))
     status = db.Column(db.String(20), default="AGENDADO")
+    cliente_id = db.Column(db.Integer)
+    veiculo_id = db.Column(db.Integer)
+    telefone = db.Column(db.String(20))
 
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     alterado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
