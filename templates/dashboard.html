@@ -22,6 +22,17 @@
         </form>
     </div>
 
+    <div class="row g-2 mb-4">
+    <div class="col-md-4">
+        <a href="/dashboard/mecanicos" class="btn btn-warning w-100 fw-bold py-3">Mecânicos</a>
+    </div>
+    <div class="col-md-4">
+        <a href="/dashboard/ordens" class="btn btn-outline-warning w-100 fw-bold py-3">Ordens de serviço</a>
+    </div>
+    <div class="col-md-4">
+        <a href="/dashboard/financeiro" class="btn btn-outline-warning w-100 fw-bold py-3">Financeiro</a>
+    </div>
+</div>
     <div class="row g-3 mb-3">
         <div class="col-md-3"><div class="card bg-dark border-warning h-100"><div class="card-body">
             <div class="text-secondary small">Faturamento total</div>
@@ -300,13 +311,13 @@
         <div class="col-lg-7">
             <div class="card bg-dark border-secondary h-100">
                 <div class="card-header border-secondary text-white">Faturamento de OS (últimos 6 meses)</div>
-                <div class="card-body"><canvas id="chartMeses" height="120"></canvas></div>
+                    <div class="card-body"><div style="height:220px"><canvas id="chartMeses"></canvas></div></div>
             </div>
         </div>
         <div class="col-lg-5">
             <div class="card bg-dark border-secondary h-100">
                 <div class="card-header border-secondary text-white">OS por status</div>
-                <div class="card-body"><canvas id="chartStatus" height="170"></canvas></div>
+                    <div class="card-body"><div style="height:220px"><canvas id="chartStatus"></canvas></div></div>
             </div>
         </div>
     </div>
@@ -399,12 +410,12 @@ new Chart(document.getElementById('chartMeses'), {
         labels: {{ labels_meses|tojson }},
         datasets: [{ label: 'Faturamento (R$)', data: {{ valores_meses|tojson }}, borderColor: '#ffc107', backgroundColor: 'rgba(255,193,7,0.15)', fill: true, tension: 0.3 }]
     },
-    options: { plugins: { legend: { labels: { color: '#ddd' } } }, scales: { x: { ticks: { color: '#bbb' }, grid: { color: 'rgba(255,255,255,0.08)' } }, y: { ticks: { color: '#bbb' }, grid: { color: 'rgba(255,255,255,0.08)' } } } }
+    options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: '#ddd' } } }, scales: { x: { ticks: { color: '#bbb' }, grid: { color: 'rgba(255,255,255,0.08)' } }, y: { ticks: { color: '#bbb' }, grid: { color: 'rgba(255,255,255,0.08)' } } } }
 });
 new Chart(document.getElementById('chartStatus'), {
     type: 'doughnut',
     data: { labels: {{ labels_status|tojson }}, datasets: [{ data: {{ valores_status|tojson }}, backgroundColor: ['#ffc107','#0dcaf0','#198754','#dc3545','#6c757d','#6610f2'] }] },
-    options: { plugins: { legend: { labels: { color: '#ddd' } } } }
+    options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: '#ddd' } } } }
 });
 </script>
 {% endblock %}

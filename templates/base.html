@@ -22,7 +22,6 @@ background:#111827;
 overflow-x:hidden;
 }
 
-/* ========== SIDEBAR ========== */
 .sidebar{
 position:fixed;
 left:0;
@@ -68,7 +67,6 @@ background:#ff6b00;
 color:white;
 }
 
-/* ========== TOPBAR ========== */
 .topbar{
 position:fixed;
 left:250px;
@@ -98,7 +96,6 @@ align-items:center;
 gap:10px;
 }
 
-/* ========== CONTENT ========== */
 .content{
 margin-left:250px;
 margin-top:60px;
@@ -127,7 +124,6 @@ margin-top:8px;
 color:#ff6b00;
 }
 
-/* ========== BOTÃO HAMBURGUER ========== */
 .btn-menu{
 display:none;
 background:transparent;
@@ -137,7 +133,6 @@ font-size:1.4rem;
 padding:6px 10px;
 }
 
-/* ========== OVERLAY (fundo escuro no mobile) ========== */
 .sidebar-overlay{
 display:none;
 position:fixed;
@@ -146,7 +141,6 @@ background:rgba(0,0,0,0.55);
 z-index:1040;
 }
 
-/* ========== TABELAS RESPONSIVAS ========== */
 .table-responsive{
 overflow-x:auto;
 -webkit-overflow-scrolling:touch;
@@ -157,7 +151,6 @@ overflow-x:auto;
 white-space:nowrap;
 }
 
-/* ========== MOBILE ========== */
 @media (max-width: 991.98px) {
 
 .btn-menu{
@@ -204,68 +197,83 @@ display:none;
 </head>
 
 <body>
+{% set perfil = (session.get('usuario_perfil') or '')|upper %}
+{% set eh_mecanico = perfil == 'MECANICO' %}
+{% set pode_usuarios = perfil in ['ADMIN', 'SUPER'] %}
 
-<!-- Overlay para fechar o menu no mobile -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
-<div class="logo" style="text-align:center; padding: 10px 0 20px;">
-    <img src="{{ url_for('static', filename='icons/icon-192.png') }}"
-         alt="HL Car"
-         style="width:64px; height:64px; border-radius:12px;">
-    <div style="color:#ff6b00; font-weight:bold; font-size:18px; margin-top:8px;">
-        HLCarERP
-    </div>
+        <div class="logo" style="text-align:center; padding:10px 0 20px; min-height:160px;">
+            <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="HLCarERP" style="width:48px; height:48px; border-radius:10px; display:block; margin:0 auto 8px;">
+            <div style="color:#ff6b00; font-weight:bold; font-size:18px; margin-top:8px;">HLCarERP</div>
+            <div style="color:#ccc; font-size:12px;">{{ empresa_nome }}</div>
 </div>
 
     <ul class="menu">
+        {% if eh_mecanico %}
+        <li><a href="/ordens"><i class="fa fa-file-alt me-2"></i> Minhas OS</a></li>
+        <li><a href="/agenda"><i class="fa fa-calendar me-2"></i> Agenda</a></li>
+        {% else %}
         <li><a href="/"><i class="fa fa-chart-line me-2"></i> Dashboard</a></li>
-<li>
-    <a href="/lembretes">
-        <i class="fa fa-bell me-2"></i> Lembretes
-        {% if lembretes_pendentes and lembretes_pendentes > 0 %}
-        <span class="badge bg-danger rounded-pill ms-1">{{ lembretes_pendentes }}</span>
-        {% endif %}
-    </a>
-</li>
+        <li>
+            <a href="/lembretes">
+                <i class="fa fa-bell me-2"></i> Lembretes
+                {% if lembretes_pendentes and lembretes_pendentes > 0 %}
+                <span class="badge bg-danger rounded-pill ms-1">{{ lembretes_pendentes }}</span>
+                {% endif %}
+            </a>
+        </li>
+        <li><a href="/ordens"><i class="fa fa-file-alt me-2"></i> Ordem de Serviço</a></li>
+                <li><a href="/agenda"><i class="fa fa-calendar me-2"></i> Agenda</a></li>
         <li><a href="/clientes"><i class="fa fa-users me-2"></i> Clientes</a></li>
         <li><a href="/veiculos"><i class="fa fa-car me-2"></i> Veículos</a></li>
-        <li><a href="/ordens"><i class="fa fa-file-alt me-2"></i> Ordem de Serviço</a></li>
         <li><a href="/estoque"><i class="fa fa-box me-2"></i> Estoque</a></li>
         <li><a href="/financeiro"><i class="fa fa-dollar-sign me-2"></i> Financeiro</a></li>
-        <li><a href="/usuarios"><i class="fa fa-user-cog me-2"></i> Usuários</a></li>
         <li><a href="/mecanicos"><i class="fa fa-wrench me-2"></i> Mecânicos</a></li>
-                <li><a href="/comissoes"><i class="fa fa-money-bill me-2"></i> Comissões</a></li>
-                        <li><a href="/empresas"><i class="fa fa-building me-2"></i> Empresas</a></li>
+        <li><a href="/comissoes"><i class="fa fa-money-bill me-2"></i> Comissões</a></li>
         <li><a href="/configuracoes"><i class="fa fa-cog me-2"></i> Configurações</a></li>
+        {% endif %}
+
+        {% if pode_usuarios %}
+        <li><a href="/usuarios"><i class="fa fa-user-cog me-2"></i> Usuários</a></li>
+        {% endif %}
+
+        {% if perfil == 'SUPER' %}
+        <li><a href="/empresas"><i class="fa fa-building me-2"></i> Empresas</a></li>
+        {% endif %}
     </ul>
 </div>
 
-<!-- TOPBAR -->
 <div class="topbar">
     <div class="d-flex align-items-center gap-2">
         <button class="btn-menu" id="btnMenu" aria-label="Menu">
             <i class="fa fa-bars"></i>
         </button>
-        <h3>HL Car Auto Center</h3>
+            {% if empresa_logo %}
+            <img src="{{ empresa_logo }}" alt="" style="width:32px; height:32px; border-radius:6px;">
+            {% endif %}
+            <h3 class="mb-0">{{ empresa_nome }}</h3>
     </div>
 
     <div class="usuario">
         <span>{{ session.get('usuario_nome', 'Usuário') }}</span>
         <a href="/logout" class="btn btn-sm btn-outline-danger">
             <i class="fa fa-sign-out-alt"></i> Sair
+            {% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in msgs %}
+    <div class="alert alert-{{ cat }} m-3">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
         </a>
     </div>
 </div>
 
-<!-- CONTEÚDO -->
 <div class="content">
     {% block conteudo %}
     {% endblock %}
 </div>
 
-<!-- Indicador Online/Offline -->
 <div id="hl-offline-badge" class="hl-badge online">
     <i class="fa fa-check-circle"></i> Online
 </div>
@@ -276,7 +284,6 @@ display:none;
 <script src="{{ url_for('static', filename='js/offline-sync.js') }}"></script>
 
 <script>
-// Menu hambúrguer
 const sidebar = document.getElementById('sidebar');
 const overlay = document.getElementById('sidebarOverlay');
 const btnMenu = document.getElementById('btnMenu');
@@ -291,7 +298,6 @@ overlay.addEventListener('click', function () {
     overlay.classList.remove('show');
 });
 
-// Fecha o menu ao clicar em um link (mobile)
 document.querySelectorAll('.menu a').forEach(function (link) {
     link.addEventListener('click', function () {
         if (window.innerWidth < 992) {
