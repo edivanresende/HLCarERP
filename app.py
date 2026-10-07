@@ -1256,7 +1256,27 @@ def dashboard_mecanicos():
     so_comissao = sum(1 for m in mecanicos if m.forma_pagamento == "comissao")
     misto = len(mecanicos) - so_salario - so_comissao
     ativos = sum(1 for m in mecanicos if m.ativo)
+    def mao_obra(o):
+        return float(getattr(o, "valor_mao_obra", 0) or getattr(o, "mao_de_obra", 0) or getattr(o, "valor_servico", 0) or 0)
 
+    ordens = OrdemServico.query.filter_by(empresa_id=eid).all()
+    producao = []
+    for m in mecanicos:
+        dele = [o for o in ordens if o.mecanico_id == m.id]
+        finalizadas = [o for o in dele if o.status == "FINALIZADA"]
+        abertas = [o for o in dele if o.status == "ABERTA"]
+        faturado = sum(mao_obra(o) for o in finalizadas)
+        salario = float(m.salario or 0)
+        comissao = faturado * float(m.percentual_comissao or 0) / 100
+        custo = salario + comissao
+        producao.append({
+            "nome": m.nome,
+            "faturado": faturado,
+            "custo": custo,
+            "resultado": faturado - custo,
+            "abertas": len(abertas),
+            "finalizadas": len(finalizadas),
+        })
     return render_template(
         "dashboard_mecanicos.html",
         mecanicos=mecanicos,
@@ -1264,10 +1284,10 @@ def dashboard_mecanicos():
         salarios=salarios,
         comissoes=comissoes,
         folha=folha,
-        so_salario=so_salario,
+        ativos=ativos,
         so_comissao=so_comissao,
         misto=misto,
-        ativos=ativos,
+        producao=producao,
     )
 
 @app.route("/dashboard/ordens")

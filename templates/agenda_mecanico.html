@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Agenda{% endblock %}
+{% block conteudo %}
+<h2 class="text-white mb-4"><i class="fa fa-calendar"></i> Agenda</h2>
+<div class="card bg-dark border-0">
+  <div class="card-body">
+    <table class="table table-dark table-hover">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Hora</th>
+          <th>Duração</th>
+          <th>Descrição</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in itens %}
+        <tr>
+          <td>{{ a.data.strftime('%d/%m/%Y') if a.data else '' }}</td>
+          <td>{{ a.hora_inicio }}</td>
+          <td>{{ a.duracao_estimada_min }} min</td>
+          <td>{{ a.descricao or '' }}</td>
+          <td>
+            {% if a.ordem_servico_id %}
+            <a class="btn btn-sm btn-warning" href="/ordens/{{ a.ordem_servico_id }}/checklist">Checklist</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-secondary text-center py-4">Nenhum agendamento.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

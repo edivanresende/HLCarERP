@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Agenda{% endblock %}
+{% block conteudo %}
+<h2 class="text-white mb-4"><i class="fa fa-calendar"></i> Agendar serviço</h2>
+
+<div class="card bg-dark border-0 mb-4">
+  <div class="card-body">
+    <form method="POST" class="row g-3">
+      <div class="col-md-3">
+        <label class="text-secondary small">Data</label>
+        <input type="date" name="data" class="form-control bg-dark text-white" required>
+      </div>
+      <div class="col-md-2">
+        <label class="text-secondary small">Hora livre</label>
+        <select name="hora_inicio" id="hora_inicio" class="form-select bg-dark text-white" required>
+          <option value="">Escolha data e mecânico</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="text-secondary small">Minutos</label>
+        <input type="number" name="duracao" value="40" class="form-control bg-dark text-white">
+      </div>
+      <div class="col-md-3">
+        <label class="text-secondary small">Mecânico</label>
+        <select name="mecanico_id" class="form-select bg-dark text-white" required>
+          {% for m in mecanicos %}
+          <option value="{{ m.id }}">{{ m.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="text-secondary small">Descrição</label>
+        <input type="text" name="descricao" class="form-control bg-dark text-white" placeholder="Troca de óleo, revisão...">
+      </div>
+      <div class="col-md-2 align-self-end">
+        <button class="btn btn-warning w-100">Agendar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<table class="table table-dark table-hover">
+  <thead>
+    <tr><th>Data</th><th>Hora</th><th>Mecânico</th><th>Descrição</th><th>Status</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for a in itens %}
+    <tr>
+      <td>{{ a.data.strftime('%d/%m/%Y') }}</td>
+      <td>{{ a.hora_inicio }}</td>
+      <td>{{ a.mecanico.nome if a.mecanico else '-' }}</td>
+      <td>{{ a.descricao or '' }}</td>
+      <td>{{ a.status or 'AGENDADO' }}</td>
+      <td>
+        <form method="POST" action="/agenda/{{ a.id }}/status" class="d-inline">
+          <select name="status" class="form-select form-select-sm bg-dark text-white d-inline w-auto" onchange="this.form.submit()">
+            {% for s in ['AGENDADO','CONFIRMADO','EM_ANDAMENTO','CONCLUIDO','FALTOU','CANCELADO'] %}
+            <option value="{{ s }}" {% if (a.status or 'AGENDADO')==s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        {% if not a.ordem_servico_id %}
+        <form method="POST" action="/agenda/{{ a.id }}/abrir-os" class="d-inline">
+          <button class="btn btn-sm btn-warning">Abrir OS</button>
+        </form>
+        {% else %}
+        <a href="/ordens/editar/{{ a.ordem_servico_id }}" class="text-warning">OS {{ a.ordem_servico.numero if a.ordem_servico and a.ordem_servico.numero else a.ordem_servico_id }}</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<script>
+function carregarHorarios() {
+  const mid = document.querySelector('[name="mecanico_id"]').value;
+  const data = document.querySelector('[name="data"]').value;
+  const dur = document.querySelector('[name="duracao"]').value || 40;
+  const sel = document.getElementById('hora_inicio');
+  sel.innerHTML = '<option value="">Carregando...</option>';
+  if (!mid || !data) {
+    sel.innerHTML = '<option value="">Escolha data e mecânico</option>';
+    return;
+  }
+  fetch('/api/agenda/horarios?mecanico_id=' + mid + '&data=' + data + '&duracao=' + dur)
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      sel.innerHTML = '';
+      var lista = (j && j.horarios) ? j.horarios : [];
+      if (!lista.length) {
+        sel.innerHTML = '<option value="">Sem horário livre neste dia</option>';
+        return;
+      }
+      lista.forEach(function (h) {
+        var o = document.createElement('option');
+        o.value = h;
+        o.textContent = h;
+        sel.appendChild(o);
+      });
+    })
+    .catch(function () {
+      sel.innerHTML = '<option value="">Erro ao carregar</option>';
+    });
+}
+['mecanico_id', 'data', 'duracao'].forEach(function (n) {
+  var el = document.querySelector('[name="' + n + '"]');
+  if (el) el.addEventListener('change', carregarHorarios);
+});
+</script>
+{% endblock %}
