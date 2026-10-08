@@ -1241,54 +1241,167 @@ def dashboard():
 @app.route("/dashboard/mecanicos")
 @login_required
 def dashboard_mecanicos():
+    from datetime import datetime, timedelta
     eid = empresa_atual()
     if not eid:
         return redirect("/login")
     if session.get("usuario_perfil") == "MECANICO":
         return redirect("/ordens")
 
-    mecanicos = Mecanico.query.filter_by(empresa_id=eid).order_by(Mecanico.nome).all()
-    nomes = [m.nome for m in mecanicos]
-    salarios = [float(m.salario or 0) for m in mecanicos]
-    comissoes = [float(m.percentual_comissao or 0) for m in mecanicos]
-    folha = sum(salarios)
-    so_salario = sum(1 for m in mecanicos if m.forma_pagamento == "salario")
-    so_comissao = sum(1 for m in mecanicos if m.forma_pagamento == "comissao")
-    misto = len(mecanicos) - so_salario - so_comissao
-    ativos = sum(1 for m in mecanicos if m.ativo)
-    def mao_obra(o):
-        return float(getattr(o, "valor_mao_obra", 0) or getattr(o, "mao_de_obra", 0) or getattr(o, "valor_servico", 0) or 0)
+    hoje = datetime.now()
+    de = request.args.get("de") or hoje.replace(day=1).strftime("%Y-%m-%d")
+    ate = request.args.get("ate") or hoje.strftime("%Y-%m-%d")
+    inicio = datetime.strptime(de, "%Y-%m-%d")
+    fim = datetime.strptime(ate, "%Y-%m-%d") + timedelta(days=1)
+    mid = request.args.get("mecanico") or ""
+    equipe = request.args.get("equipe") or ""
+    servico = (request.args.get("servico") or "").strip().lower()
+    os_num = (request.args.get("os") or "").strip()
+
+    todos = Mecanico.query.filter_by(empresa_id=eid).order_by(Mecanico.nome).all()
+    mecanicos = []
+    for m in todos:
+        if mid and str(m.id) != mid:
+            continue
+        if equipe and (m.tipo or "") != equipe:
+            continue
+        mecanicos.append(m)
+
+    def horas_dia(m):
+        bruto = (m.hora_saida or 18) - (m.hora_entrada or 9)
+        almoco = (m.almoco_fim or 14) - (m.almoco_inicio or 12)
+        return max(bruto - almoco, 0)
+
+    dias = 0
+    d = inicio
+    while d < fim:
+        if d.weekday() < 5:
+            dias += 1
+        d += timedelta(days=1)
 
     ordens = OrdemServico.query.filter_by(empresa_id=eid).all()
-    producao = []
+    motivos = [
+        "Aguardando peças", "Aguardando autorização", "Aguardando ferramenta",
+        "Aguardando equipamento", "Aguardando diagnóstico", "Falta de serviço",
+        "Aguardando aprovação do cliente", "Outros",
+    ]
+    parados = {x: 0 for x in motivos}
+    ranking = []
+    servicos_exec = []
+    soma_prod = soma_disp = soma_est = soma_exec = 0
+    retrabalho_qtd = retrabalho_valor = 0
+
     for m in mecanicos:
         dele = [o for o in ordens if o.mecanico_id == m.id]
-        finalizadas = [o for o in dele if o.status == "FINALIZADA"]
-        abertas = [o for o in dele if o.status == "ABERTA"]
-        faturado = sum(mao_obra(o) for o in finalizadas)
+        if os_num:
+            dele = [o for o in dele if str(o.numero) == os_num]
+        if servico:
+            dele = [o for o in dele if servico in (o.servico_executado or "").lower()]
+        no_periodo = []
+        for o in dele:
+            data = o.data_finalizacao or o.data_abertura
+            if data and inicio <= data < fim:
+                no_periodo.append(o)
+        finalizadas = [o for o in no_periodo if o.status == "FINALIZADA"]
+        retr = [o for o in finalizadas if o.is_retrabalho]
+        fat_serv = sum(float(o.valor_servicos or 0) for o in finalizadas)
+        fat_pecas = sum(float(o.valor_produtos or 0) for o in finalizadas)
+        comissao = fat_serv * float(m.percentual_comissao or 0) / 100
         salario = float(m.salario or 0)
-        comissao = faturado * float(m.percentual_comissao or 0) / 100
         custo = salario + comissao
-        producao.append({
-            "nome": m.nome,
-            "faturado": faturado,
-            "custo": custo,
-            "resultado": faturado - custo,
-            "abertas": len(abertas),
-            "finalizadas": len(finalizadas),
+        disp = horas_dia(m) * dias
+        exec_h = 0
+        est_h = 0
+        for o in finalizadas:
+            if o.data_inicio and o.data_finalizacao:
+                exec_h += max((o.data_finalizacao - o.data_inicio).total_seconds() / 3600, 0)
+            else:
+                exec_h += 1
+            est_h += 1
+        prod_h = min(exec_h, disp) if disp else exec_h
+        improd = max(disp - prod_h, 0)
+        ocup = (prod_h / disp * 100) if disp else 0
+        efic = (est_h / exec_h * 100) if exec_h else 0
+        extra = max(exec_h - disp, 0)
+        soma_prod += prod_h
+        soma_disp += disp
+        soma_est += est_h
+        soma_exec += exec_h
+        retrabalho_qtd += len(retr)
+        retrabalho_valor += sum(float(o.valor_servicos or 0) for o in retr)
+        ranking.append({
+            "id": m.id, "nome": m.nome, "ativo": m.ativo,
+            "fat_serv": fat_serv, "fat_pecas": fat_pecas,
+            "lucro_serv": fat_serv - custo, "os": len(finalizadas),
+            "retrab": len(retr),
+            "retrab_pct": (len(retr) / len(finalizadas) * 100) if finalizadas else 0,
+            "disp": disp, "prod": prod_h, "improd": improd, "exec": exec_h,
+            "extra": extra, "ocup": ocup, "efic": efic,
+            "medio": (exec_h / len(finalizadas)) if finalizadas else 0,
         })
+        servicos_exec.append({
+            "nome": m.nome, "qtd": len(finalizadas), "os": len(finalizadas),
+            "vencidas": est_h, "executadas": exec_h,
+            "medio": (exec_h / len(finalizadas)) if finalizadas else 0,
+        })
+    ranking.sort(key=lambda x: x["lucro_serv"], reverse=True)
+
+    abertos = ApontamentoMecanico.query.filter_by(empresa_id=eid, fim=None).all() if "ApontamentoMecanico" in globals() else []
+    ao_vivo = []
+    agora = datetime.utcnow()
+    for m in mecanicos:
+        ap = next((a for a in abertos if a.mecanico_id == m.id), None)
+        if not ap:
+            ao_vivo.append({"nome": m.nome, "texto": "Sem apontamento"})
+            continue
+        minutos = int((agora - ap.inicio).total_seconds() / 60) if ap.inicio else 0
+        if ap.tipo == "PARADO":
+            parados[ap.motivo or "Outros"] = parados.get(ap.motivo or "Outros", 0) + minutos
+            ao_vivo.append({"nome": m.nome, "texto": "%s · OS %s · parado %s min" % (ap.motivo, ap.ordem_id or "-", minutos)})
+        elif ap.tipo == "INTERVALO":
+            ao_vivo.append({"nome": m.nome, "texto": "Intervalo · %s min" % minutos})
+        else:
+            ao_vivo.append({"nome": m.nome, "texto": "OS %s · %s · há %s min" % (ap.ordem_id or "-", ap.servico or "serviço", minutos)})
+
+    prod_geral = (soma_prod / soma_disp * 100) if soma_disp else 0
+    efic_geral = (soma_est / soma_exec * 100) if soma_exec else 0
     return render_template(
         "dashboard_mecanicos.html",
-        mecanicos=mecanicos,
-        nomes=nomes,
-        salarios=salarios,
-        comissoes=comissoes,
-        folha=folha,
-        ativos=ativos,
-        so_comissao=so_comissao,
-        misto=misto,
-        producao=producao,
+        mecanicos=mecanicos, todos=todos, ranking=ranking, ao_vivo=ao_vivo,
+        parados=parados, motivos=motivos, servicos_exec=servicos_exec,
+        nomes=[m.nome for m in mecanicos],
+        salarios=[float(m.salario or 0) for m in mecanicos],
+        comissoes=[float(m.percentual_comissao or 0) for m in mecanicos],
+        folha=sum(float(m.salario or 0) for m in mecanicos),
+        ativos=sum(1 for m in mecanicos if m.ativo),
+        so_comissao=sum(1 for m in mecanicos if m.forma_pagamento == "comissao"),
+        misto=sum(1 for m in mecanicos if m.forma_pagamento not in ("salario", "comissao")),
+        producao=[{"nome": r["nome"], "faturado": r["fat_serv"], "custo": r["fat_serv"] - r["lucro_serv"], "resultado": r["lucro_serv"], "abertas": 0, "finalizadas": r["os"]} for r in ranking],
+        prod_geral=prod_geral, efic_geral=efic_geral,
+        horas_prod=soma_prod, retrabalho_qtd=retrabalho_qtd, retrabalho_valor=retrabalho_valor,
+        de=de, ate=ate, mid=mid, equipe=equipe, servico=request.args.get("servico") or "", os_num=os_num,
+        prod_horas=[r["prod"] for r in ranking], improd_horas=[r["improd"] for r in ranking],
     )
+
+@app.route("/mecanicos/apontar", methods=["POST"])
+@login_required
+def apontar_mecanico():
+    from datetime import datetime
+    eid = empresa_atual()
+    mid = int(request.form.get("mecanico_id"))
+    abertos = ApontamentoMecanico.query.filter_by(empresa_id=eid, mecanico_id=mid, fim=None).all()
+    for a in abertos:
+        a.fim = datetime.utcnow()
+    db.session.add(ApontamentoMecanico(
+        empresa_id=eid, mecanico_id=mid,
+        ordem_id=request.form.get("ordem_id") or None,
+        tipo=request.form.get("tipo"),
+        motivo=request.form.get("motivo"),
+        servico=request.form.get("servico"),
+        inicio=datetime.utcnow(),
+    ))
+    db.session.commit()
+    return redirect("/dashboard/mecanicos")
 
 @app.route("/dashboard/ordens")
 @login_required

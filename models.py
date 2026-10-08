@@ -821,3 +821,14 @@ class PagamentoComissao(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     mecanico = db.relationship("Mecanico", backref="pagamentos_comissao")
+class ApontamentoMecanico(db.Model):
+    __tablename__ = "apontamentos_mecanico"
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, index=True)
+    mecanico_id = db.Column(db.Integer, index=True)
+    ordem_id = db.Column(db.Integer)
+    tipo = db.Column(db.String(20))
+    motivo = db.Column(db.String(40))
+    servico = db.Column(db.String(200))
+    inicio = db.Column(db.DateTime, default=datetime.utcnow)
+    fim = db.Column(db.DateTime)
