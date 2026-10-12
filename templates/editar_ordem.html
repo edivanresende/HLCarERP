@@ -4,7 +4,54 @@
 
 {% block conteudo %}
 <div class="container-fluid">
-
+<div class="card bg-dark border-secondary p-3 mb-3 text-white">
+    <div class="d-flex justify-content-between">
+            <div class="text-secondary">Situação atual</div>
+            <h4 class="mb-1">
+                {% if ordem.status == 'FINALIZADA' %}Concluída
+                {% elif ordem.status == 'EM_EXECUCAO' %}Em execução
+                {% elif ordem.status == 'AGUARDANDO' %}Aguardando
+                {% elif ordem.status == 'CANCELADA' %}Cancelada
+                {% else %}{{ ordem.status or 'Aberta' }}{% endif %}
+            </h4>
+            <div>OS {{ ordem.numero }} · Cliente: {{ ordem.cliente.nome if ordem.cliente else '-' }} · Placa: {{ ordem.veiculo.placa if ordem.veiculo else '-' }}</div>
+        </div>
+        {% if (session.get('usuario_perfil') or '')|upper == 'MECANICO' and ordem.status != 'FINALIZADA' %}
+        <form method="post" action="/ordens/{{ ordem.id }}/cronometro" class="row g-2">
+            <div class="col-12">
+                <select name="mecanico_id" class="form-select">
+                    {% for m in mecanicos %}<option value="{{ m.id }}">{{ m.nome }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <select name="motivo" class="form-select">
+                    <option>Aguardando peças</option>
+                    <option>Aguardando autorização</option>
+                    <option>Aguardando ferramenta</option>
+                    <option>Aguardando equipamento</option>
+                    <option>Aguardando diagnóstico</option>
+                    <option>Falta de serviço</option>
+                    <option>Aguardando aprovação do cliente</option>
+                    <option>Outros</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button name="acao" value="iniciar" class="btn btn-primary">Iniciar</button>
+                <button name="acao" value="pausar" class="btn btn-warning">Pausar</button>
+                <button name="acao" value="finalizar" class="btn btn-success">Finalizar</button>
+            </div>
+        </form>
+        {% else %}
+<div class="text-secondary">Só o mecânico altera a situação. Concluída não volta.</div>
+{% endif %}
+    </div>
+    <hr>
+    {% for e in eventos %}
+    <div>{{ e.criado_em.strftime('%d/%m %H:%M') }} — {{ e.texto }}</div>
+    {% else %}
+    <div class="text-secondary">Nenhum evento ainda.</div>
+    {% endfor %}
+</div>
     <h2 class="mb-4 text-white">Editar Ordem de Serviço Nº {{ ordem.numero }}</h2>
 
     <div class="card-dashboard">

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}
+Entrada por XML
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="container-fluid p-4">
+    <h3 class="text-white mb-3">Entrada de Compra por XML</h3>
+    <p class="text-secondary">Importe o XML da NF-e do fornecedor para dar entrada automática no estoque.</p>
+
+    <form method="post" enctype="multipart/form-data" class="card p-4 mt-3" style="max-width: 500px;">
+        <div class="mb-3">
+            <label class="form-label">Arquivo XML da NF-e</label>
+            <input type="file" name="xml" accept=".xml" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-success">Importar e Dar Entrada</button>
+        <a href="/estoque" class="btn btn-secondary ms-2">Voltar</a>
+    </form>
+</div>
+
+{% endblock %}

@@ -8,7 +8,13 @@
         <h2 class="text-white mb-0">Editar Empresa</h2>
         <a href="/empresas" class="btn btn-secondary">Voltar</a>
     </div>
-
+    <form method="POST" action="/empresas/{{ empresa.id }}/confirmar-pix" class="mb-3">
+        <button class="btn btn-success">Confirmar PIX (+30 dias)</button>
+        <span class="text-secondary ms-2">
+            Status: {{ empresa.status_pagamento }}
+            · Vence: {{ empresa.data_vencimento.strftime('%d/%m/%Y') if empresa.data_vencimento else '-' }}
+        </span>
+    </form>
     <div class="card bg-dark border-0">
         <div class="card-body">
             <form method="POST">
@@ -53,6 +59,8 @@
                     <div class="col-md-3">
                         <label class="form-label text-white">Plano</label>
                         <select name="plano" class="form-select bg-dark text-white border-secondary">
+                            <option value="TRIAL" {% if empresa.plano == 'TRIAL' %}selected{% endif %}>Trial</option>
+                            <option value="MENSAL" {% if empresa.plano == 'MENSAL' %}selected{% endif %}>Mensal</option>
                             <option value="BASICO" {% if empresa.plano == 'BASICO' %}selected{% endif %}>Básico</option>
                             <option value="PRO" {% if empresa.plano == 'PRO' %}selected{% endif %}>Pro</option>
                             <option value="ILIMITADO" {% if empresa.plano == 'ILIMITADO' %}selected{% endif %}>Ilimitado</option>
@@ -61,6 +69,8 @@
                     <div class="col-md-3">
                         <label class="form-label text-white">Status Pagamento</label>
                         <select name="status_pagamento" class="form-select bg-dark text-white border-secondary">
+                            <option value="TRIAL" {% if empresa.status_pagamento == 'TRIAL' %}selected{% endif %}>Teste 7 dias</option>
+                            <option value="AGUARDANDO_PIX" {% if empresa.status_pagamento == 'AGUARDANDO_PIX' %}selected{% endif %}>Aguardando PIX</option>
                             <option value="ATIVO" {% if empresa.status_pagamento == 'ATIVO' %}selected{% endif %}>Ativo</option>
                             <option value="BLOQUEADO" {% if empresa.status_pagamento == 'BLOQUEADO' %}selected{% endif %}>Bloqueado (atraso)</option>
                             <option value="INATIVO" {% if empresa.status_pagamento == 'INATIVO' %}selected{% endif %}>Inativo</option>

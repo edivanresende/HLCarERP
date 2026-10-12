@@ -77,10 +77,15 @@
                                        value="{{ empresa.url_nfse if empresa and empresa.url_nfse else '' }}"
                                        placeholder="Ex: https://www.nfse.gov.br/EmissorNacional/">
                                 <small class="text-secondary">Usado na Opção 1 (Manual)</small>
-                            </div>
+            </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label text-secondary">CEP</label>
+            <div class="col-12">
+              <label class="form-label text-secondary">Logo da oficina</label>
+              <input class="form-control" type="file" name="logo">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label text-secondary">CEP</label>
                                 <input type="text" name="cep" class="form-control bg-dark text-white border-secondary"
                                        value="{{ empresa.cep if empresa else '' }}">
                             </div>

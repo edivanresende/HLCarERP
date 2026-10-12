@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
 {% block conteudo %}
+{% set eh_mecanico = (session.get('usuario_perfil') or '')|upper == 'MECANICO' %}
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Ordens de Serviço</h2>
+    <h2>{{ 'Minhas OS' if eh_mecanico else 'Ordens de Serviço' }}</h2>
     <div class="d-flex gap-2">
-        <a href="/abrir-os-placa" class="btn btn-outline-warning"></a>
-            Abrir por Placa
+        <a href="/abrir-os-placa" class="btn btn-outline-warning">
+            {{ 'Pré-abertura por foto' if eh_mecanico else 'Abrir por Placa' }}
         </a>
-        <a href="/ordens/nova" class="btn btn-warning">
-            Nova Ordem
-        </a>
+        {% if not eh_mecanico %}
+        <a href="/ordens/nova" class="btn btn-warning">Nova Ordem</a>
+        {% endif %}
     </div>
 </div>
 
-<!-- ===== FILTRO DE DATA ===== -->
 <div class="card bg-dark shadow border-0 mb-4">
     <div class="card-body py-3">
         <form method="GET" class="row g-3 align-items-end">
@@ -62,7 +62,10 @@
                 <select name="status" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.submit()">
                     <option value="">Todos</option>
                     <option value="ABERTA" {{ 'selected' if status == 'ABERTA' else '' }}>Aberta</option>
-                    <option value="FINALIZADA" {{ 'selected' if status == 'FINALIZADA' else '' }}>Finalizada</option>
+                    <option value="EM_EXECUCAO" {{ 'selected' if status == 'EM_EXECUCAO' else '' }}>Em execução</option>
+                    <option value="AGUARDANDO" {{ 'selected' if status == 'AGUARDANDO' else '' }}>Aguardando</option>
+                    <option value="FINALIZADA" {{ 'selected' if status == 'FINALIZADA' else '' }}>Concluída</option>
+                    <option value="CANCELADA" {{ 'selected' if status == 'CANCELADA' else '' }}>Cancelada</option>
                 </select>
             </div>
 
@@ -75,14 +78,10 @@
         </form>
     </div>
 </div>
-<!-- ===== FIM DO FILTRO ===== -->
 
 <div class="card bg-dark shadow border-0">
-
     <div class="card-body">
-
         <table class="table table-dark table-hover align-middle">
-
             <thead>
                 <tr>
                     <th>Nº</th>
@@ -90,11 +89,12 @@
                     <th>Veículo</th>
                     <th>KM</th>
                     <th>Status</th>
+                    {% if not eh_mecanico %}
                     <th>Total</th>
-                    <th width="420">Ações</th>
+                    {% endif %}
+                    <th width="220">Ações</th>
                 </tr>
             </thead>
-
             <tbody>
                 {% for ordem in ordens %}
                 <tr>
@@ -109,40 +109,47 @@
                     <td>{{ ordem.km }}</td>
                     <td>
                         {% if ordem.status == "FINALIZADA" %}
-                            <span class="badge bg-success">FINALIZADA</span>
+                            <span class="badge bg-success">Concluída</span>
+                        {% elif ordem.status == "EM_EXECUCAO" %}
+                            <span class="badge bg-primary">Em execução</span>
+                        {% elif ordem.status == "AGUARDANDO" %}
+                            <span class="badge bg-warning text-dark">Aguardando</span>
+                        {% elif ordem.status == "CANCELADA" %}
+                            <span class="badge bg-dark">Cancelada</span>
                         {% else %}
-                            <span class="badge bg-warning text-dark">ABERTA</span>
+                            <span class="badge bg-secondary">{{ ordem.status or "Aberta" }}</span>
                         {% endif %}
                     </td>
+                    {% if not eh_mecanico %}
                     <td>R$ {{ "%.2f"|format(ordem.valor_total or 0) }}</td>
+                    {% endif %}
                     <td>
-                        <a href="/ordens/pdf/{{ ordem.id }}" target="_blank" class="btn btn-outline-light btn-sm" title="Gerar PDF">
-                            📄
-                        </a>
-                        <a href="/ordens/{{ ordem.id }}/nfse" class="btn btn-outline-info btn-sm" title="Emitir NFS-e">NF</a>
-                        <a href="/ordens/{{ ordem.id }}/checklist" class="btn btn-outline-warning btn-sm" title="Checklist do Veículo">
+                        <a href="/ordens/{{ ordem.id }}/checklist" class="btn btn-outline-warning btn-sm">
                             Checklist
                         </a>
-
-                        {% if ordem.status != "FINALIZADA" %}
-                        <a href="/ordens/editar/{{ ordem.id }}" class="btn btn-primary btn-sm">
-                            Editar
-                        </a>
-                        {% endif %}
-
-                        {% if ordem.status != "FINALIZADA" %}
-                        <a href="/ordens/finalizar/{{ ordem.id }}"
-                           class="btn btn-success btn-sm"
-                           onclick="return confirm('Deseja finalizar esta Ordem de Serviço?')">
-                            Finalizar
-                        </a>
-                        {% endif %}
-            <a href="/ordens/editar/{{ ordem.id }}" class="btn btn-sm btn-outline-warning">Ver</a>
+                        <form method="post" action="/ordens/{{ ordem.id }}/cronometro" class="d-inline">
+    <input type="hidden" name="mecanico_id" value="{{ session.get('mecanico_id') }}">
+    <button name="acao" value="iniciar" class="btn btn-sm btn-primary">Iniciar</button>
+    <button name="acao" value="pausar" class="btn btn-sm btn-warning">Pausar</button>
+    <button name="acao" value="finalizar" class="btn btn-sm btn-success">Finalizar</button>
+</form>
+                        {% if not eh_mecanico %}
+                        <a href="/ordens/pdf/{{ ordem.id }}" target="_blank" class="btn btn-outline-light btn-sm" title="Gerar PDF">📄</a>
+                        <a href="/ordens/{{ ordem.id }}/nfse" class="btn btn-outline-info btn-sm">NF</a>
+{% if ordem.status != "FINALIZADA" %}
+<a href="/ordens/editar/{{ ordem.id }}" class="btn btn-primary btn-sm">Editar</a>
+<a href="/ordens/finalizar/{{ ordem.id }}" class="btn btn-success btn-sm" onclick="return confirm('Deseja finalizar esta Ordem de Serviço?')">Finalizar</a>
+{% endif %}
+{% if ordem.status == "FINALIZADA" %}
+<form method="post" action="/ordens/{{ ordem.id }}/reabrir" class="d-inline">
+    <button class="btn btn-sm btn-warning">Reabrir</button>
+</form>
+{% endif %}
+                        <a href="/ordens/ver/{{ ordem.id }}" class="btn btn-sm btn-outline-warning">Ver</a>
                         <a href="/ordens/excluir/{{ ordem.id }}"
                            class="btn btn-secondary btn-sm"
-                           onclick="return confirm('Deseja realmente excluir esta Ordem de Serviço?')">
-                            Excluir
-                        </a>
+                           onclick="return confirm('Deseja realmente excluir esta Ordem de Serviço?')">Excluir</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% else %}
@@ -153,11 +160,8 @@
                 </tr>
                 {% endfor %}
             </tbody>
-
         </table>
-
     </div>
-
 </div>
 
 {% endblock %}

@@ -386,6 +386,7 @@ class MovimentacaoEstoque(db.Model):
     produto_id = db.Column(db.Integer, db.ForeignKey("produtos.id"), nullable=False, index=True)
     compra_id = db.Column(db.Integer, db.ForeignKey("compras.id"))
     ordem_servico_id = db.Column(db.Integer, db.ForeignKey("ordens_servico.id"))
+    tipo = db.Column(db.String(20), nullable=False)                 # <-- adiciona esta linha
     tipo_movimento = db.Column(db.String(20), nullable=False)
     origem = db.Column(db.String(30), nullable=False)
     quantidade = db.Column(Numeric(18, 3), nullable=False)
@@ -832,3 +833,12 @@ class ApontamentoMecanico(db.Model):
     servico = db.Column(db.String(200))
     inicio = db.Column(db.DateTime, default=datetime.utcnow)
     fim = db.Column(db.DateTime)
+class EventoOS(db.Model):
+    __tablename__ = "eventos_os"
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, index=True)
+    ordem_id = db.Column(db.Integer, index=True)
+    mecanico_id = db.Column(db.Integer)
+    tipo = db.Column(db.String(30))
+    texto = db.Column(db.String(200))
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)

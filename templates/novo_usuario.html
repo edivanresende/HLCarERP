@@ -46,8 +46,9 @@
                     <label class="form-label text-secondary">Perfil</label>
                     <select name="perfil" class="form-select bg-dark text-white border-secondary">
                         <option value="ADMIN" {{ 'selected' if usuario and usuario.perfil == 'ADMIN' else '' }}>ADMIN</option>
+                        <option value="USUARIO" {{ 'selected' if usuario and usuario.perfil == 'USUARIO' else '' }}>USUARIO</option>
+                        <option value="MECANICO" {{ 'selected' if usuario and usuario.perfil == 'MECANICO' else '' }}>MECANICO</option>
                         <option value="CONSULTOR" {{ 'selected' if not usuario or usuario.perfil == 'CONSULTOR' else '' }}>CONSULTOR</option>
-                        <option value="MECANICO" {{ 'selected' if usuario and usuario.perfil == 'MECANICO' else '' }}>MECÂNICO</option>
                     </select>
                 </div>
 

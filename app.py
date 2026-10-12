@@ -46,6 +46,8 @@ from models import (
     ContaPagar,
     Caixa,
     PagamentoComissao,
+    ApontamentoMecanico,
+    EventoOS,
 )
 
 from pdf_ordem_old import gerar_pdf_ordem
@@ -1208,7 +1210,7 @@ def dashboard():
         valores_status=valores_status,
         labels_meses=labels_meses,
         valores_meses=valores_meses,
-                receber_vencidas=receber_vencidas,
+        receber_vencidas=receber_vencidas,
         receber_7=receber_7,
         receber_30=receber_30,
         receber_total_pendente=receber_total_pendente,
@@ -2193,6 +2195,8 @@ def nova_ordem():
 @app.route("/ordens/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_ordem(id):
+    if (session.get("usuario_perfil") or "").upper() == "MECANICO":
+        return redirect("/ordens")
     eid = empresa_atual()
     if not eid:
         return redirect("/login")
@@ -2402,6 +2406,7 @@ def editar_ordem(id):
         produtos=produtos,
         servicos_os=servicos_os,
         itens_os=itens_os,
+        eventos = EventoOS.query.filter_by(ordem_id=ordem.id).order_by(EventoOS.criado_em).all(),
     )
 
 def gerar_conta_receber_os(ordem):
@@ -4839,7 +4844,214 @@ def ensure_agenda_extra():
                 c.commit()
             except Exception:
                 c.rollback()
+def _evento(eid, ordem_id, texto, tipo, mecanico_id=None):
+    from datetime import datetime
+    db.session.add(EventoOS(
+        empresa_id=eid, ordem_id=ordem_id, mecanico_id=mecanico_id,
+        tipo=tipo, texto=texto, criado_em=datetime.utcnow(),
+    ))
 
+@app.route("/ordens/<int:id>/cronometro", methods=["POST"])
+@login_required
+def cronometro_os(id):
+    from datetime import datetime
+    eid = empresa_atual()
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
+    perfil = (session.get("usuario_perfil") or "").upper()
+    if perfil != "MECANICO":
+        return redirect("/ordens")
+    if ordem.status == "FINALIZADA":
+        return redirect("/ordens")
+    acao = request.form.get("acao")
+    mid = request.form.get("mecanico_id") or ordem.mecanico_id
+    motivo = request.form.get("motivo") or "Outros"
+    agora = datetime.utcnow()
+    abertos = ApontamentoMecanico.query.filter_by(empresa_id=eid, ordem_id=ordem.id, fim=None).all()
+    for a in abertos:
+        a.fim = agora
+    if acao == "iniciar":
+        ordem.status = "EM_EXECUCAO"
+        if not ordem.data_inicio:
+            ordem.data_inicio = agora
+        db.session.add(ApontamentoMecanico(
+            empresa_id=eid, mecanico_id=mid, ordem_id=ordem.id,
+            tipo="TRABALHANDO", servico=ordem.servico_executado, inicio=agora,
+        ))
+        _evento(eid, ordem.id, "Serviço iniciado", "INICIO", mid)
+    elif acao == "pausar":
+        ordem.status = "AGUARDANDO"
+        db.session.add(ApontamentoMecanico(
+            empresa_id=eid, mecanico_id=mid, ordem_id=ordem.id,
+            tipo="PARADO", motivo=motivo, inicio=agora,
+        ))
+        _evento(eid, ordem.id, "Pausa: " + motivo, "PAUSA", mid)
+    elif acao == "finalizar":
+        ordem.status = "FINALIZADA"
+        ordem.data_finalizacao = agora
+        _evento(eid, ordem.id, "Serviço finalizado", "FIM", mid)
+    db.session.commit()
+    return redirect("/ordens")
+
+@app.route("/ordens/<int:id>/reabrir", methods=["POST"])
+@login_required
+def reabrir_os(id):
+    if (session.get("usuario_perfil") or "").upper() == "MECANICO":
+        return redirect("/ordens")
+    eid = empresa_atual()
+    ordem = OrdemServico.query.filter_by(id=id, empresa_id=eid).first_or_404()
+    ordem.status = "ABERTA"
+    db.session.commit()
+    return redirect("/ordens")
+import xml.etree.ElementTree as ET
+from werkzeug.utils import secure_filename
+import os
+
+@app.route("/estoque/entrada-xml", methods=["GET", "POST"])
+@login_required
+def entrada_xml():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+
+    if request.method == "POST":
+        arquivo = request.files.get("xml")
+        if not arquivo or not arquivo.filename.lower().endswith(".xml"):
+            flash("Envie um arquivo XML válido.", "danger")
+            return redirect("/estoque/entrada-xml")
+
+        try:
+            tree = ET.parse(arquivo)
+            root = tree.getroot()
+            ns = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+
+            # Dados da nota
+            ide = root.find(".//nfe:ide", ns)
+            emit = root.find(".//nfe:emit", ns)
+            infNFe = root.find(".//nfe:infNFe", ns)
+
+            numero = ide.find("nfe:nNF", ns).text if ide is not None and ide.find("nfe:nNF", ns) is not None else ""
+            serie = ide.find("nfe:serie", ns).text if ide is not None and ide.find("nfe:serie", ns) is not None else ""
+            chave = infNFe.get("Id", "").replace("NFe", "") if infNFe is not None else ""
+            data_emissao_txt = ide.find("nfe:dhEmi", ns).text[:10] if ide is not None and ide.find("nfe:dhEmi", ns) is not None else date.today().isoformat()
+
+            # Fornecedor
+            cnpj_forn = emit.find("nfe:CNPJ", ns).text if emit is not None and emit.find("nfe:CNPJ", ns) is not None else ""
+            nome_forn = emit.find("nfe:xNome", ns).text if emit is not None and emit.find("nfe:xNome", ns) is not None else "Fornecedor XML"
+
+            fornecedor = Fornecedor.query.filter_by(empresa_id=eid, cnpj=cnpj_forn).first()
+            if not fornecedor:
+                fornecedor = Fornecedor(
+                    empresa_id=eid,
+                    razao_social=nome_forn,
+                    nome_fantasia=nome_forn,
+                    cnpj=cnpj_forn,
+                    ativo=True
+                )
+                db.session.add(fornecedor)
+                db.session.flush()
+
+            # Cria a Compra
+            compra = Compra(
+                empresa_id=eid,
+                fornecedor_id=fornecedor.id,
+                numero_nf=numero,
+                serie_nf=serie,
+                chave_nf=chave,
+                data_emissao=datetime.strptime(data_emissao_txt, "%Y-%m-%d") if data_emissao_txt else datetime.utcnow(),
+                data_entrada=datetime.utcnow(),
+                status="FINALIZADA",
+                observacoes="Importado via XML"
+            )
+            db.session.add(compra)
+            db.session.flush()
+
+            # Itens
+            total_nota = 0
+            for det in root.findall(".//nfe:det", ns):
+                prod = det.find("nfe:prod", ns)
+                if prod is None:
+                    continue
+
+                cProd = prod.find("nfe:cProd", ns).text if prod.find("nfe:cProd", ns) is not None else ""
+                xProd = prod.find("nfe:xProd", ns).text if prod.find("nfe:xProd", ns) is not None else "Produto XML"
+                qCom = float(prod.find("nfe:qCom", ns).text) if prod.find("nfe:qCom", ns) is not None else 0
+                vUnCom = float(prod.find("nfe:vUnCom", ns).text) if prod.find("nfe:vUnCom", ns) is not None else 0
+                vProd = float(prod.find("nfe:vProd", ns).text) if prod.find("nfe:vProd", ns) is not None else 0
+                ncm = prod.find("nfe:NCM", ns).text if prod.find("nfe:NCM", ns) is not None else ""
+
+                # Busca ou cria produto
+                produto = Produto.query.filter_by(empresa_id=eid, codigo=cProd).first()
+                if not produto:
+                    # Categoria padrão
+                    cat = Categoria.query.filter_by(empresa_id=eid, nome="Geral").first()
+                    if not cat:
+                        cat = Categoria(empresa_id=eid, nome="Geral", ativo=True)
+                        db.session.add(cat)
+                        db.session.flush()
+
+                    produto = Produto(
+                        empresa_id=eid,
+                        categoria_id=cat.id,
+                        codigo=cProd or f"XML{compra.id}",
+                        descricao=xProd[:250],
+                        ncm=ncm,
+                        estoque_atual=0,
+                        preco_compra=vUnCom,
+                        preco_venda=round(vUnCom * 1.5, 2),
+                        unidade="UN",
+                        controla_estoque=True,
+                        ativo=True
+                    )
+                    db.session.add(produto)
+                    db.session.flush()
+
+                # Atualiza estoque
+                saldo_anterior = float(produto.estoque_atual or 0)
+                produto.estoque_atual = saldo_anterior + qCom
+                produto.preco_compra = vUnCom
+
+                # Item da compra
+                item = ItemCompra(
+                    compra_id=compra.id,
+                    produto_id=produto.id,
+                    quantidade=qCom,
+                    valor_unitario=vUnCom,
+                    valor_total=vProd
+                )
+                db.session.add(item)
+
+                # Movimentação
+                mov = MovimentacaoEstoque(
+                    empresa_id=eid,
+                    produto_id=produto.id,
+                    compra_id=compra.id,
+                    tipo="ENTRADA",
+                    tipo_movimento="ENTRADA",
+                    origem="COMPRA_XML",
+                    quantidade=qCom,
+                    saldo_anterior=saldo_anterior,
+                    saldo_atual=produto.estoque_atual,
+                    custo_unitario=vUnCom,
+                    valor_total=vProd,
+                    observacoes=f"NF {numero}"
+                )
+                db.session.add(mov)
+
+                total_nota += vProd
+
+            compra.valor_total = total_nota
+            db.session.commit()
+            flash(f"XML importado com sucesso. Compra #{compra.id} — Total R$ {total_nota:.2f}", "success")
+            return redirect("/estoque")
+
+        except Exception as e:
+            db.session.rollback()
+            print("Erro XML:", e)
+            flash(f"Erro ao processar XML: {e}", "danger")
+            return redirect("/estoque/entrada-xml")
+
+    return render_template("entrada_xml.html")
+        
 with app.app_context():
     ensure_agenda_extra()
 if __name__ == "__main__":
