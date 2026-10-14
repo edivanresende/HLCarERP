@@ -8,7 +8,7 @@ Estoque
 
 <div class="container-fluid">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
             <h2 class="text-white mb-1">
                 <i class="fa fa-boxes"></i>
@@ -18,7 +18,7 @@ Estoque
                 Gerenciamento completo de produtos, fornecedores e movimentações.
             </small>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
             <a href="/estoque/entrada-rapida" class="btn btn-success">
                 <i class="fa fa-barcode"></i>
                 Entrada Rápida (Bipe)
@@ -35,7 +35,7 @@ Estoque
 
     <!-- DASHBOARD -->
     <div class="row g-3 mb-4">
-        <div class="col-lg-3">
+        <div class="col-lg-3 col-md-6">
             <div class="card border-0 shadow h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -51,7 +51,7 @@ Estoque
             </div>
         </div>
 
-        <div class="col-lg-3">
+        <div class="col-lg-3 col-md-6">
             <div class="card border-0 shadow h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -69,7 +69,7 @@ Estoque
             </div>
         </div>
 
-        <div class="col-lg-3">
+        <div class="col-lg-3 col-md-6">
             <div class="card border-0 shadow h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -85,7 +85,7 @@ Estoque
             </div>
         </div>
 
-        <div class="col-lg-3">
+        <div class="col-lg-3 col-md-6">
             <div class="card border-0 shadow h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -106,12 +106,12 @@ Estoque
     <div class="card border-0 shadow mb-4">
         <div class="card-body">
             <div class="row g-3 align-items-end">
-                <div class="col-lg-4">
+                <div class="col-lg-4 col-md-6">
                     <label class="form-label">Pesquisar Produto</label>
                     <input type="text" class="form-control" id="pesquisaProduto"
                            placeholder="Descrição, código ou código de barras...">
                 </div>
-                <div class="col-lg-2">
+                <div class="col-lg-2 col-md-6">
                     <label class="form-label">Categoria</label>
                     <select class="form-select" id="categoriaFiltro">
                         <option value="">Todas</option>
@@ -122,7 +122,7 @@ Estoque
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-lg-2">
+                <div class="col-lg-2 col-md-6">
                     <label class="form-label">Fabricante</label>
                     <select class="form-select" id="fabricanteFiltro">
                         <option value="">Todos</option>
@@ -131,7 +131,7 @@ Estoque
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-lg-2">
+                <div class="col-lg-2 col-md-6">
                     <label class="form-label">Situação</label>
                     <select class="form-select" id="situacaoFiltro">
                         <option value="">Todas</option>
@@ -139,7 +139,7 @@ Estoque
                         <option value="0">Inativos</option>
                     </select>
                 </div>
-                <div class="col-lg-2 d-grid">
+                <div class="col-lg-2 col-md-6 d-grid">
                     <button class="btn btn-primary" type="button">
                         <i class="fa fa-search"></i>
                         Pesquisar
@@ -149,43 +149,29 @@ Estoque
         </div>
     </div>
 
-    <!-- MENU RÁPIDO -->
-    <div class="row g-3 mb-4">
-        <div class="col-lg-2 d-grid">
-            <a href="/estoque/entrada-rapida" class="btn btn-success">
-                <i class="fa fa-barcode"></i> Entrada Rápida
-            </a>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/estoque/entrada-xml" class="btn btn-primary">
-                <i class="fa fa-file-code"></i> Entrada por XML
-            </a>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/categorias" class="btn btn-outline-warning">
-                <i class="fa fa-tags"></i> Categorias
-            </a>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/fabricantes" class="btn btn-outline-primary">
-                <i class="fa fa-industry"></i> Fabricantes
-            </a>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/fornecedores" class="btn btn-outline-success">
-                <i class="fa fa-truck"></i> Fornecedores
-            </a>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/compras" class="btn btn-outline-info">
-                <i class="fa fa-cart-shopping"></i> Compras
-            </a>
-        </div>
-        <div class="col-lg-2 d-grid">
-            <a href="/movimentacoes" class="btn btn-outline-secondary">
-                <i class="fa fa-right-left"></i> Movimentações
-            </a>
-        </div>
+    <!-- MENU RÁPIDO (responsivo) -->
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="/estoque/entrada-rapida" class="btn btn-success">
+            <i class="fa fa-barcode"></i> Entrada Rápida
+        </a>
+        <a href="/estoque/entrada-xml" class="btn btn-primary">
+            <i class="fa fa-file-code"></i> Entrada por XML
+        </a>
+        <a href="/categorias" class="btn btn-outline-warning">
+            <i class="fa fa-tags"></i> Categorias
+        </a>
+        <a href="/fabricantes" class="btn btn-outline-primary">
+            <i class="fa fa-industry"></i> Fabricantes
+        </a>
+        <a href="/fornecedores" class="btn btn-outline-success">
+            <i class="fa fa-truck"></i> Fornecedores
+        </a>
+        <a href="/compras" class="btn btn-outline-info">
+            <i class="fa fa-cart-shopping"></i> Compras
+        </a>
+        <a href="/movimentacoes" class="btn btn-outline-secondary">
+            <i class="fa fa-right-left"></i> Movimentações
+        </a>
     </div>
 
     <!-- TABELA -->
