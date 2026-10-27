@@ -4,6 +4,7 @@ from flask import (
     request,
     redirect,
     send_file,
+    send_from_directory,
     jsonify,
     session,
     url_for,
@@ -5051,7 +5052,12 @@ def entrada_xml():
             return redirect("/estoque/entrada-xml")
 
     return render_template("entrada_xml.html")
-        
+@app.route('/service-worker.js')
+def service_worker():
+    response = send_from_directory('static', 'service-worker.js')
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache'
+    return response        
 with app.app_context():
     ensure_agenda_extra()
 if __name__ == "__main__":
