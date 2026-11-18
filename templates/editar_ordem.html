@@ -161,8 +161,8 @@
                                     <th style="width:110px">Origem</th>
                                     <th>Descrição / Produto</th>
                                     <th style="width:80px">Qtd</th>
-                                    <th style="width:110px">Valor Compra</th>
-                                    <th style="width:110px">Valor Venda</th>
+                                    <th style="width:110px">Custo</th>
+                                    <th style="width:110px">Valor unit.</th>
                                     <th style="width:110px">Total</th>
                                     <th style="width:50px"></th>
                                 </tr>
@@ -332,10 +332,8 @@ function adicionarPeca(origem, dados) {
             'value="' + (d.descricao || '').replace(/"/g, '&quot;') + '" required>';
     }
 
-    const valorCompra = (origem === 'PARCEIRO') ? (d.valor_compra || 0) : 0;
-    const compraHtml = (origem === 'PARCEIRO')
-        ? '<input type="number" name="item_valor_compra" value="' + valorCompra + '" min="0" step="0.01" class="form-control form-control-sm bg-dark text-white border-secondary">'
-        : '<input type="hidden" name="item_valor_compra" value="0"><span class="text-secondary small">—</span>';
+    const valorCompra = d.valor_compra || 0;
+    const compraHtml = '<input type="number" name="item_valor_compra" value="' + valorCompra + '" min="0" step="0.01" class="form-control form-control-sm bg-dark text-white border-secondary">';
 
     tr.innerHTML =
         '<td><span class="badge ' + (origem === 'ESTOQUE' ? 'bg-info' : 'bg-warning text-dark') + '">' + origem + '</span></td>' +
