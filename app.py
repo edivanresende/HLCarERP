@@ -2263,7 +2263,6 @@ def editar_ordem(id):
         ordem.defeito_relatado = request.form.get("defeito_relatado")
         ordem.diagnostico = request.form.get("diagnostico")
         ordem.servico_executado = request.form.get("servico_executado")
-        ordem.mecanico = ", ".join(nomes) if nomes else ordem.mecanico
         ordem.valor_servicos = total_servicos
         ordem.valor_produtos = valor_pecas
         ordem.desconto = desconto
