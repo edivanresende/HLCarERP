@@ -160,16 +160,17 @@
                                 <tr>
                                     <th style="width:110px">Origem</th>
                                     <th>Descrição / Produto</th>
-                                    <th style="width:90px">Qtd</th>
-                                    <th style="width:120px">Valor unit.</th>
-                                    <th style="width:120px">Total</th>
+                                    <th style="width:80px">Qtd</th>
+                                    <th style="width:110px">Valor Compra</th>
+                                    <th style="width:110px">Valor Venda</th>
+                                    <th style="width:110px">Total</th>
                                     <th style="width:50px"></th>
                                 </tr>
                             </thead>
                             <tbody id="corpo-pecas"></tbody>
                             <tfoot>
                                 <tr>
-                                    <td colspan="4" class="text-end text-secondary">Total peças</td>
+                                    <td colspan="5" class="text-end text-secondary">Total peças</td>
                                     <td><strong id="total-pecas-label">R$ 0,00</strong></td>
                                     <td></td>
                                 </tr>
@@ -244,6 +245,7 @@
     "produto_id": {{ it.produto_id or 0 }},
     "descricao": {{ (it.descricao or "")|tojson }},
     "qtd": {{ (it.quantidade or 1)|float }},
+    "valor_compra": {{ (it.valor_parceiro or it.custo_unitario or 0)|float }},
     "valor_unit": {{ (it.valor_unitario or 0)|float }}
   }{% if not loop.last %},{% endif %}
 {% endfor %}
@@ -330,11 +332,17 @@ function adicionarPeca(origem, dados) {
             'value="' + (d.descricao || '').replace(/"/g, '&quot;') + '" required>';
     }
 
+    const valorCompra = (origem === 'PARCEIRO') ? (d.valor_compra || 0) : 0;
+    const compraHtml = (origem === 'PARCEIRO')
+        ? '<input type="number" name="item_valor_compra" value="' + valorCompra + '" min="0" step="0.01" class="form-control form-control-sm bg-dark text-white border-secondary">'
+        : '<input type="hidden" name="item_valor_compra" value="0"><span class="text-secondary small">—</span>';
+
     tr.innerHTML =
         '<td><span class="badge ' + (origem === 'ESTOQUE' ? 'bg-info' : 'bg-warning text-dark') + '">' + origem + '</span></td>' +
         '<td>' + descHtml + '</td>' +
         '<td><input type="number" name="item_qtd" value="' + (d.qtd || 1) + '" min="0.01" step="0.01" ' +
         'class="form-control form-control-sm bg-dark text-white border-secondary" oninput="recalcularLinha(' + id + ')"></td>' +
+        '<td>' + compraHtml + '</td>' +
         '<td><input type="number" name="item_valor_unit" id="item_vu_' + id + '" value="' + (d.valor_unit || 0) + '" min="0" step="0.01" ' +
         'class="form-control form-control-sm bg-dark text-white border-secondary" oninput="recalcularLinha(' + id + ')"></td>' +
         '<td><span id="item_total_' + id + '">R$ 0,00</span></td>' +
