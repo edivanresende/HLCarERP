@@ -285,6 +285,11 @@ display:none;
 <script src="{{ url_for('static', filename='js/offline-db.js') }}"></script>
 <script src="{{ url_for('static', filename='js/offline-queue.js') }}"></script>
 <script src="{{ url_for('static', filename='js/offline-sync.js') }}"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/service-worker.js');
+}
+</script>
 
 <script>
 const sidebar = document.getElementById('sidebar');
