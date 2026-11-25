@@ -1,4 +1,4 @@
-    from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import UniqueConstraint, Index, Numeric
 from datetime import datetime, date
 
