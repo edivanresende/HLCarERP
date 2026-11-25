@@ -46,6 +46,7 @@ from models import (
     ContaReceber,
     ContaPagar,
     Caixa,
+    CategoriaDespesa,
     PagamentoComissao,
     ApontamentoMecanico,
     EventoOS,
@@ -2338,25 +2339,24 @@ def editar_ordem(id):
 
                 if not desc:
                     desc = "Peça"
-                try:
-                    custo = float(custos[i] if i < len(custos) else 0)
-                except Exception:
-                    custo = 0.0
+# Pega o valor de compra enviado pelo formulário
+try:
+    valor_compra = float(request.form.getlist("item_valor_compra")[i] or 0)
+except (IndexError, ValueError, TypeError):
+    valor_compra = 0.0
 
-                if custo == 0 and tipo == "ESTOQUE" and prod:
-                    custo = float(prod.preco_compra or 0)
-
-                db.session.add(ItemOrdemServico(
-                    ordem_servico_id=ordem.id,
-                    produto_id=pid if pid > 0 else None,
-                    origem=tipo if tipo in ("ESTOQUE", "PARCEIRO") else "ESTOQUE",
-                    tipo_item="PRODUTO",
-                    descricao=desc,
-                    quantidade=qtd,
-                    custo_unitario=custo,
-                    valor_unitario=vu,
-                    valor_total=qtd * vu,
-                ))
+db.session.add(ItemOrdemServico(
+    ordem_servico_id=ordem.id,
+    produto_id=pid if pid > 0 else None,
+    origem=tipo if tipo in ("ESTOQUE", "PARCEIRO") else "ESTOQUE",
+    tipo_item="PRODUTO",
+    descricao=desc,
+    quantidade=qtd,
+    custo_unitario=custo,
+    valor_parceiro=valor_compra if tipo == "PARCEIRO" else 0,
+    valor_unitario=vu,
+    valor_total=qtd * vu,
+))
             except Exception as e:
                 print("Erro item OS (edit):", e)
         km_os = int(request.form.get("km") or 0)
@@ -5056,7 +5056,53 @@ def service_worker():
     response = send_from_directory('static', 'service-worker.js')
     response.headers['Service-Worker-Allowed'] = '/'
     response.headers['Cache-Control'] = 'no-cache'
-    return response        
+    return response 
+    # ============================================================
+# CATEGORIAS DE DESPESA
+# ============================================================
+def garantir_categorias_despesa(eid):
+    """Cria categorias padrão se não existirem."""
+    if not eid:
+        return
+    padrao = [
+        "Energia Elétrica", "Água", "Aluguel", "Produtos de Limpeza",
+        "Funcionários / Salários", "Impostos", "Boletos", "Telefone / Internet",
+        "Manutenção", "Combustível", "Outros Gastos"
+    ]
+    existentes = {c.nome for c in CategoriaDespesa.query.filter_by(empresa_id=eid).all()}
+    for nome in padrao:
+        if nome not in existentes:
+            c = CategoriaDespesa(empresa_id=eid, nome=nome, ativo=True)
+            db.session.add(c)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+@app.route("/financeiro/categorias")
+@login_required
+def categorias_despesa():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    garantir_categorias_despesa(eid)
+    lista = CategoriaDespesa.query.filter_by(empresa_id=eid).order_by(CategoriaDespesa.nome).all()
+    return render_template("categorias_despesa.html", categorias=lista)
+
+
+@app.route("/financeiro/categorias/novo", methods=["POST"])
+@login_required
+def nova_categoria_despesa():
+    eid = empresa_atual()
+    if not eid:
+        return redirect("/login")
+    nome = (request.form.get("nome") or "").strip()
+    if nome:
+        if not CategoriaDespesa.query.filter_by(empresa_id=eid, nome=nome).first():
+            db.session.add(CategoriaDespesa(empresa_id=eid, nome=nome, ativo=True))
+            db.session.commit()
+    return redirect("/financeiro/categorias")       
 with app.app_context():
     ensure_agenda_extra()
 if __name__ == "__main__":

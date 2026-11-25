@@ -1,4 +1,4 @@
-from flask_sqlalchemy import SQLAlchemy
+    from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import UniqueConstraint, Index, Numeric
 from datetime import datetime, date
 
@@ -174,6 +174,29 @@ class Categoria(db.Model):
 
     __table_args__ = (
         UniqueConstraint("empresa_id", "nome", name="uk_categoria_empresa"),
+    )
+
+
+
+# ==========================================================
+# CATEGORIAS DE DESPESA
+# ==========================================================
+
+class CategoriaDespesa(db.Model):
+    __tablename__ = "categorias_despesa"
+
+    id = db.Column(db.Integer, primary_key=True)
+    empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    descricao = db.Column(db.String(255))
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    alterado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    empresa = db.relationship("Empresa")
+
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "nome", name="uk_categoria_despesa_empresa"),
     )
 
 
@@ -561,7 +584,8 @@ class ContaPagar(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     empresa_id = db.Column(db.Integer, db.ForeignKey("empresas.id"), nullable=False, index=True)
-    fornecedor_id = db.Column(db.Integer, db.ForeignKey("fornecedores.id"), nullable=False)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey("fornecedores.id"), nullable=True)
+    categoria_despesa_id = db.Column(db.Integer, db.ForeignKey("categorias_despesa.id"), nullable=True)
     compra_id = db.Column(db.Integer, db.ForeignKey("compras.id"))
     descricao = db.Column(db.String(250), nullable=False)
     data_emissao = db.Column(db.DateTime, default=datetime.utcnow)
@@ -580,6 +604,7 @@ class ContaPagar(db.Model):
 
     empresa = db.relationship("Empresa")
     fornecedor = db.relationship("Fornecedor")
+    categoria_despesa = db.relationship("CategoriaDespesa")
     compra = db.relationship("Compra")
 
 
@@ -842,3 +867,4 @@ class EventoOS(db.Model):
     tipo = db.Column(db.String(30))
     texto = db.Column(db.String(200))
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
