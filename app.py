@@ -2341,7 +2341,8 @@ def editar_ordem(id):
                     desc = "Peça"
 # Pega o valor de compra enviado pelo formulário
 try:
-    valor_compra = float(request.form.getlist("item_valor_compra")[i] or 0)
+    lista_compra = request.form.getlist("item_valor_compra")
+    valor_compra = float(lista_compra[i]) if i < len(lista_compra) else 0.0
 except (IndexError, ValueError, TypeError):
     valor_compra = 0.0
 
