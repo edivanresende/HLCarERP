@@ -2339,12 +2339,12 @@ def editar_ordem(id):
 
                 if not desc:
                     desc = "Peça"
-# Pega o valor de compra enviado pelo formulário
-try:
-    lista_compra = request.form.getlist("item_valor_compra")
-    valor_compra = float(lista_compra[i]) if i < len(lista_compra) else 0.0
-except (IndexError, ValueError, TypeError):
-    valor_compra = 0.0
+                # Pega o valor de compra enviado pelo formulário
+                try:
+                    lista_compra = request.form.getlist("item_valor_compra")
+                    valor_compra = float(lista_compra[i]) if i < len(lista_compra) else 0.0
+                except (IndexError, ValueError, TypeError):
+                    valor_compra = 0.0
 
 db.session.add(ItemOrdemServico(
     ordem_servico_id=ordem.id,
