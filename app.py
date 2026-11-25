@@ -2346,18 +2346,18 @@ def editar_ordem(id):
                 except (IndexError, ValueError, TypeError):
                     valor_compra = 0.0
 
-db.session.add(ItemOrdemServico(
-    ordem_servico_id=ordem.id,
-    produto_id=pid if pid > 0 else None,
-    origem=tipo if tipo in ("ESTOQUE", "PARCEIRO") else "ESTOQUE",
-    tipo_item="PRODUTO",
-    descricao=desc,
-    quantidade=qtd,
-    custo_unitario=custo,
-    valor_parceiro=valor_compra if tipo == "PARCEIRO" else 0,
-    valor_unitario=vu,
-    valor_total=qtd * vu,
-))
+                db.session.add(ItemOrdemServico(
+                    ordem_servico_id=ordem.id,
+                    produto_id=pid if pid > 0 else None,
+                    origem=tipo if tipo in ("ESTOQUE", "PARCEIRO") else "ESTOQUE",
+                    tipo_item="PRODUTO",
+                    descricao=desc,
+                    quantidade=qtd,
+                    custo_unitario=custo,
+                    valor_parceiro=valor_compra if tipo == "PARCEIRO" else 0,
+                    valor_unitario=vu,
+                    valor_total=qtd * vu,
+                ))
             except Exception as e:
                 print("Erro item OS (edit):", e)
         km_os = int(request.form.get("km") or 0)
